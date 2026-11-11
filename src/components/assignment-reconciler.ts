@@ -71,9 +71,11 @@ export class AssignmentReconciler {
 
   }
 
-  private async _startExecution(assignment: Assignment, ticket: Ticket, agent: Agent, client: OpencodeAgentClientInterface): Promise<void> {
+  private async _startExecution(ticket: TicketModelInterface, agent: AgentModelInterface): Promise<void> {
     // A failed fetch does not create an execution or count as an attempt.
     const task = await this.vikunja.getTask(ticket.vikunjaTaskId)
+    const assignment = await this.assignments.create(ticket, agent);
+    await this.executions.create(assignment)
     const execution = await this.database.createExecution(assignment.id, this._timestamp())
     if (await this._agentReadyForSession(agent, execution, client)) await this._createSessionAndSend(execution, task, client)
   }

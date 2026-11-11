@@ -1,6 +1,6 @@
 # Agent resource manager session context
 
-Estimated reading time: 19 minutes (150 WPM)
+Estimated reading time: 21 minutes (150 WPM)
 
 ## Working agreement
 
@@ -35,6 +35,12 @@ Estimated reading time: 19 minutes (150 WPM)
 
 ## Recent context
 
+- User requested the `Executions.create` implementation. Added in-memory creation with a local ID, assignment ID, `starting` status, current timestamp, and null optional fields; it appends and returns the execution without SQLite persistence. Existing `getLatest` still returns its uninitialized field and does not see the new execution. Targeted lint passes; project typecheck still fails on in-progress refactor errors. No tests written or changed.
+- User requested `create` on `ExecutionsInterface`. Added a method accepting an assignment model and returning `Promise<ExecutionModelInterface>`, following the current reconciler call and assignment pattern. Targeted lint passes; `Executions` still needs to implement it. No tests written or changed.
+- User asked to implement `Assignments.create`. Added in-memory creation: an ID after the highest supplied ID, ticket and agent IDs, `assigned` status, current timestamp, and null completion; it appends and returns the model. It does not persist to SQLite. Targeted lint passes; project typecheck still reports unrelated in-progress refactor errors. No tests written or changed.
+- User corrected `AssignmentsInterface.create` to return an assignment model. Changed the return to `Promise<AssignmentModelInterface>`; the class implementation remains outstanding. No tests written or changed.
+- User clarified that `AssignmentsInterface.create` accepts a ticket model and an agent model. Added `create(ticket, agent): Promise<void>` to the interface, using the previously suggested void return; targeted lint passes. The `Assignments` class does not yet implement it, and project typecheck fails on that and other in-progress refactor errors. No tests written or changed.
+- User asked to add `create` to `AssignmentsInterface`. Its parameters and return value were not specified; asked for the intended signature before changing the contract. No code changed.
 - User requested the same collection pattern for executions, pointing to `getLatestExecution`. Added execution model and collection interfaces plus `Executions.find` by execution ID and `list`, mirroring assignments. It does not yet provide latest-by-assignment lookup or integrate with the reconciler. Targeted lint passes; project typecheck still fails in the existing reconciler refactor and constructor wiring. No tests written or changed.
 - User requested the assignments interface and implementation in the same collection pattern as tickets. Added assignment model and collection interfaces and `Assignments` with `find` and `list`; no tests were written or changed. Targeted lint passes; project typecheck still fails on the existing reconciler refactor and constructor wiring. `list` returns the supplied collection without filtering completed assignments.
 - User said not to write tests anymore and asked to record that in the agents file. Added the instruction to project `AGENTS.md`; existing tests were left untouched.

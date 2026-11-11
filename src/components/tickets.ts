@@ -2,7 +2,8 @@ import type { TicketModelInterface } from "../interfaces/ticket-model.interface.
 import type { TicketsInterface } from "../interfaces/tickets.interface.js"
 
 export class Tickets implements TicketsInterface {
-  constructor(private readonly tickets: TicketModelInterface[] = []) {}
+  constructor(private readonly tickets: TicketModelInterface[] = [],
+  ) {}
 
   find(ticketId: number): TicketModelInterface | undefined {
     return this.tickets.find((ticket) => ticket.id === ticketId)

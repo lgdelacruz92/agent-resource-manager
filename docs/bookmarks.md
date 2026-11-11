@@ -1,9 +1,11 @@
 # Resource Manager bookmark
 
-Estimated reading time: 8 minutes (150 WPM)
+Estimated reading time: 9 minutes (150 WPM)
 
 ## Current task
 
+- Implemented `Executions.create(assignment)` as in-memory creation with a local ID and `starting` status; it does not persist to SQLite. The existing `getLatest` returns an uninitialized field and does not see created executions. Targeted lint passes; project typecheck still reports in-progress refactor errors.
+- `Assignments.create(ticket, agent)` now appends and returns an in-memory assignment with a locally generated ID and `assigned` status; it does not persist to SQLite. Targeted lint passes; project typecheck still reports other in-progress refactor errors. No tests written or changed.
 - Added `ExecutionModelInterface`, `ExecutionsInterface`, and `Executions` using the assignment collection pattern. `find` searches by execution ID; latest-by-assignment lookup and reconciler integration are not implemented. Targeted lint passes; project typecheck still fails in the in-progress reconciler refactor. No tests written or changed.
 - User is refactoring toward collection and model interfaces. Added `TicketModelInterface`, `TicketsInterface`, and `Tickets`; the user wired `Tickets` into the reconciler. Added `AssignmentModelInterface`, `AssignmentsInterface`, and `Assignments` with the same `find` and `list` pattern; `list` does not filter completed assignments. Targeted lint passes, but project typecheck fails on the existing reconciler refactor and constructor wiring. User asked to defer the `find` concern and not write tests unless explicitly requested.
 - `src/components/agent-model.ts` began as a dummy; the user has since added a database-backed `update`. Its fields still have placeholder defaults, and the earlier dummy-test and verification results predate that change.
