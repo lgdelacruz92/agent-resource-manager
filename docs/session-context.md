@@ -1,6 +1,6 @@
 # Agent resource manager session context
 
-Estimated reading time: 17 minutes (150 WPM)
+Estimated reading time: 18 minutes (150 WPM)
 
 ## Working agreement
 
@@ -35,6 +35,10 @@ Estimated reading time: 17 minutes (150 WPM)
 
 ## Recent context
 
+- User said not to write tests anymore and asked to record that in the agents file. Added the instruction to project `AGENTS.md`; existing tests were left untouched.
+- User asked to create the discussed ticket files and defer the `find` concern. Added the ticket model and collection interfaces, `Tickets` collection, and a focused test; did not wire the collection into the reconciler. The ticket test passes. Project lint and typecheck fail in the existing in-progress reconciler refactor, including its missing database dependency and constructor wiring.
+- User asked what applying the `Agents` collection pattern to ticket lookup in `AssignmentReconciler.runOnce` would look like, to check understanding. Discussed a `Tickets` collection with `find`, an injected interface, and replacing the database lookup; noted that the synchronous collection requires tickets to be loaded and raises a freshness decision. No implementation requested.
+- User asked whether I see the `Agents` pattern in `AssignmentReconciler.runOnce`. Discussed the injected collection interface, finding a model by ID, and moving individual agent updates behind the model; identified the refactor as incomplete because the reconciler still refers to a removed database dependency. No code changes requested.
 - User requested a dummy implementation of `AgentModelInterface`. Added `src/components/agent-model.ts` with placeholder field values and an empty `update` method, plus a focused test. The focused test, lint, and source typecheck pass; no real model behavior was added.
 - User requested unit tests for `Agents`. Replaced the outdated dummy test with five cases covering listing, targeted updates, missing IDs, asynchronous completion, and update failures. Three pass; two fail because `Agents.update` does not await the model update or propagate its rejection. Full lint and source typecheck pass. Left implementation unchanged.
 - User asked whether `find` throws or returns `undefined` when no item matches. Clarified that it returns `undefined`; the caller can throw explicitly. No source changes requested.
