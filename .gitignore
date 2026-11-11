@@ -3,3 +3,5 @@ dist/
 !tsconfig.json
 !package-lock.json
 .env*
+.
+**/*/db.sql*
