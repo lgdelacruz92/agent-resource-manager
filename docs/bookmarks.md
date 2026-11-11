@@ -4,6 +4,10 @@ Estimated reading time: 6 minutes (150 WPM)
 
 ## Current task
 
+- User asked how to load `.env.local` with `tsx watch src/index.ts`. Suggested the Node `--env-file` option; no configuration changes requested.
+
+## Previous task: board-driven completion
+
 - User proposes no review stage in the manager: another app may handle review later. The manager would use a ticket previously In progress and now in Vikunja Done as the assignment-completion signal. This is discussion only; trigger details, failure handling, and edge cases remain open.
 - Refactored `_reconcile` in `src/components/assignment-reconciler.ts` into shorter, descriptive private methods for starting, recovering, and monitoring work. Lint, typecheck, and all 57 tests passed.
 - Discussed its flow: it reads the latest execution; most failures are finalized for scheduler retry, while a session missing before work was requested can lead to a new execution directly. A missing URL leaves the assignment reserved.

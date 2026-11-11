@@ -35,6 +35,7 @@ Estimated reading time: 13 minutes (150 WPM)
 
 ## Recent context
 
+- User asked how to load `.env.local` with `tsx watch src/index.ts`. Suggested Node's `--env-file` option; no app or configuration changes requested.
 - User asked to be reminded of the board-driven completion gaps on returning. Recorded all six open questions and the first suggested discussion in [bookmarks](bookmarks.md); no implementation was requested.
 - User proposed dropping the manager's review stage: another app can handle review later, while the manager completes an assignment when its ticket was previously In progress and is now Done. Discussed gaps including missed In progress transitions, current automatic Done moves, external board changes, failures, agent availability, and stale or unavailable board data. No implementation requested.
 - User proposed adding an `in_review` execution status before completing an assignment. Discussed whether review belongs to the execution or assignment, and the need for an explicit signal to enter review rather than assuming an idle session has a PR. This is a proposal; no status design or implementation was agreed.
