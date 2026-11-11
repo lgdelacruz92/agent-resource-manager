@@ -6,5 +6,8 @@ export interface AgentData {
 }
 
 export interface AgentModelInterface extends AgentData {
-  update(status: string): Promise<void>
+  get(): Promise<AgentData | null>
+  create(): Promise<AgentModelInterface>
+  update(agent: string | AgentData): Promise<void>
+  delete(): Promise<void>
 }

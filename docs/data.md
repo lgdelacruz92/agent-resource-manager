@@ -1,34 +1,64 @@
 # Resource Manager data proposal
 
-Estimated reading time: 8 minutes (150 WPM)
+Estimated reading time: 9 minutes (150 WPM)
 
 This is the working shared-data design. The Resource Manager has been refactored to domain collections and models; its new flow has not been verified against deployed services. The [sequence diagram](sequence-diagram.md) describes the earlier flow and may differ from current code.
 
-## Executions
+## Database schema
 
-An execution record tracks startup and work for an assignment. The `executions` table keeps OpenCode session and attempt history for monitoring and debugging. A record does not necessarily count as an attempt; see the counting rules below. The user approved the execution and lock fields shown below.
+This diagram covers all five tables in the [fresh SQLite seed](../shared-db/seed.sql). It describes the seed, not necessarily an existing database.
 
 ```mermaid
 erDiagram
-    EXECUTIONS {
-        INTEGER id PK "Identifies the execution"
-        INTEGER assignment_id FK "Links to the assignment"
-        TEXT session_id "OpenCode session ID when known"
-        TEXT status "Attempt state"
-        TEXT created_at "When the record was created"
-        TEXT work_requested_at "When the work request was recorded"
-        TEXT started_at "When work started if known"
-        TEXT finished_at "When the outcome was decided"
-        TEXT failure_reason "Why the attempt failed if applicable"
+    tickets ||--o{ assignments : has
+    agents ||--o{ assignments : receives
+    assignments ||--o{ executions : has
+
+    tickets {
+        INTEGER id PK
+        INTEGER vikunja_task_id UK
+        TEXT title
+        TEXT status
+        INTEGER priority
+        INTEGER present_on_board "0 or 1; defaults to 0"
     }
-    LOCKS {
-        TEXT name PK "Identifies the shared lock"
-        TEXT owner "Identifies the current holder"
-        TEXT acquired_at "When the lock was acquired"
+    agents {
+        INTEGER id PK
+        TEXT name
+        TEXT status
+        TEXT url "Nullable"
+    }
+    assignments {
+        INTEGER id PK
+        INTEGER ticket_id FK
+        INTEGER agent_id FK
+        TEXT status
+        TEXT assigned_at
+        TEXT completed_at "Nullable"
+    }
+    executions {
+        INTEGER id PK
+        INTEGER assignment_id FK
+        TEXT session_id "Nullable"
+        TEXT status
+        TEXT created_at
+        TEXT work_requested_at "Nullable"
+        TEXT started_at "Nullable"
+        TEXT finished_at "Nullable"
+        TEXT failure_reason "Nullable"
+    }
+    locks {
+        TEXT name PK
+        TEXT owner
+        TEXT acquired_at
     }
 ```
 
-Types match the Ticket Scheduler's manual SQLite seed, not proof that any particular database has been prepared. The execution's session ID, work request time, start and finish times, and failure reason may be empty. See [setup](setup.md) for prerequisites and seed limitations.
+Each assignment references one ticket and one agent; each execution references one assignment. A ticket, agent, or assignment can have zero or more related records. `locks` is independent of the other tables. All unmarked columns are required, and all five tables are SQLite `STRICT` tables. See [setup](setup.md) for prerequisites and seed limitations.
+
+## Executions
+
+An execution record tracks startup and work for an assignment. The `executions` table keeps OpenCode session and attempt history for monitoring and debugging. A record does not necessarily count as an attempt; see the counting rules below. The user approved the execution and lock fields shown above.
 
 The `locks` table coordinates the Resource Manager and Ticket Scheduler. Both claim and release the row using short database operations. Neither holds a SQLite transaction open during Vikunja calls. The manager warns when a lock is held for more than two minutes, but leaves it for human review. Recovery steps remain deferred.
 

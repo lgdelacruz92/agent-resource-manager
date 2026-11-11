@@ -1,8 +1,16 @@
 # Resource Manager bookmark
 
-Estimated reading time: 6 minutes (150 WPM)
+Estimated reading time: 7 minutes (150 WPM)
 
 ## Current task
+
+- All four model classes and interfaces now provide SQLite create, get, update, and delete methods. Ticket collections return model instances; ticket status validation includes `Flagged tickets`. Deleting agents and tickets is blocked when assignments reference them, and deleting assignments is blocked when executions reference them. Existing update calling patterns remain supported. Targeted model/collection typecheck and lint pass; full project typecheck is blocked by the existing syntax error in `assignment-reconciler.ts`. No tests or live database operations were run.
+
+## Previous task: database diagram
+
+- Documented all five tables in `shared-db/seed.sql` with a Mermaid ER diagram in `docs/data.md`, including columns, relationships, and the independent locks table. Verified against an in-memory seed; the diagram does not describe a verified live database. No live database was accessed or changed.
+
+## Previous task: domain collection refactor
 
 - Refactored the manager to inject SQLite-backed `Agents`, `Tickets`, `Assignments`, and `Executions`; individual agent, assignment, and execution models handle their own writes. The reconciler uses the existing assignment and its latest execution; the older broad database class is no longer wired into the manager.
 - User chose manager-monitored executions, In progress when work is sent, direct Vikunja confirmation of Done before successful release, and Retry on failure. The manager retains reservations if safe completion cannot be established and coordinates completion under the scheduler lock.

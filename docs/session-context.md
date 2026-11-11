@@ -1,6 +1,6 @@
 # Agent resource manager session context
 
-Estimated reading time: 23 minutes (150 WPM)
+Estimated reading time: 25 minutes (150 WPM)
 
 ## Working agreement
 
@@ -35,6 +35,12 @@ Estimated reading time: 23 minutes (150 WPM)
 
 ## Recent context
 
+- User requested CRUD methods on all models, using assignments and tickets as blueprints. Added missing SQLite methods and interface declarations for agents, executions, and tickets; ticket collections now return `TicketModel` instances. Protected referenced agent deletion, preserved existing update call patterns, and added `Flagged tickets` to valid ticket statuses. Targeted model/collection typecheck and lint pass; full typecheck remains blocked by the existing `assignment-reconciler.ts` syntax error. No tests or live database operations were run.
+- User requested `create`, `get`, and `delete` on `TicketModel`. Added SQLite operations, constructor-supplied data, generated IDs, validation and a guard against deleting tickets with assignments. `get` accepts only the statuses in the current ticket interface; the methods are not on the interface or wired into `Tickets`. Targeted lint and strict typecheck pass; full typecheck is blocked by the existing `assignment-reconciler.ts` syntax error. No tests or live database operations were run.
+- User requested the discussed visibility fix. Removed `private` from the six ticket properties while keeping them readonly; isolated strict typecheck and targeted ESLint pass. No tests were written or run.
+- User asked about the error on line 4 of `ticket-model.ts`. Targeted ESLint passes; the TypeScript interface error comes from private fields where the interface requires public properties. Explained that removing `private` exposes them while `readonly` can remain. No source changes requested.
+- User asked about the TypeScript error in `src/components/ticket-model.ts` line 20. Isolated typecheck shows `presentOnBoard` is a boolean, which Node SQLite does not accept as a bound value; the schema stores it as 0 or 1. Also observed a separate private-property interface error and a syntax error blocking full project typecheck. No source changes requested.
+- User requested a Mermaid ER diagram of all tables in `shared-db/seed.sql` in `docs/data.md`. Added all five tables, their columns and foreign-key relationships, and noted that the seed may differ from an existing database. Validated against an in-memory seed; no live database was accessed or changed.
 - User requested a complete refactor in the established collection/model direction and decided: reuse the existing assignment, manager monitors execution, mark In progress when work is sent, directly check Vikunja for Done on success, and move failures to Retry. Implemented SQLite-backed collections and models, per-assignment execution lookup, app wiring, monitoring and lock-coordinated completion. Updated setup and data docs. Lint, typecheck, and build pass; no tests were written or run, and no services or live database were started. The refactored flow and deployed APIs remain unverified.
 - User asked whether I understand the direction of the last two hours of refactoring. Reviewed recent commits and current code: the apparent direction is to replace the reconciler's broad database dependency with injected domain collections and database-aware models, leaving the reconciler to coordinate the workflow. This is an interpretation for the user to confirm; the refactor is incomplete. No implementation requested.
 - User requested that `Assignments.create` use `AssignmentModel.create`. Injected `DatabaseSync` into the collection, created the model, awaited its database insert, then added it to the collection. The ID now comes from SQLite; failed inserts do not add an item. Targeted lint and isolated typecheck pass. No tests or live database operations were performed.

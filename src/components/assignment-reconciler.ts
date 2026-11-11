@@ -50,6 +50,11 @@ export class AssignmentReconciler {
   private async _reconcile(assignment: AssignmentModelInterface, ticket: TicketModelInterface, agent: AgentModelInterface): Promise<void> {
     const execution = this.executions.getLatest(assignment.id)
     if (execution?.status === "failed") {
+      // move vikunja ticket to retry
+      // update assignment status
+      await assignment.update({...assignment, status: 'failed'});
+      // update ticket status
+      
       await this._finishAssignment(assignment, ticket, agent, "failed")
       return
     }

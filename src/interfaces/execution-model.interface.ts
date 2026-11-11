@@ -13,6 +13,8 @@ export interface ExecutionData {
 }
 
 export interface ExecutionModelInterface extends ExecutionData {
+  get(): Promise<ExecutionData | null>
   create(): Promise<ExecutionModelInterface>
-  update(): Promise<void>
+  update(execution?: ExecutionData): Promise<void>
+  delete(): Promise<void>
 }

@@ -49,12 +49,12 @@ export class AssignmentModel implements AssignmentModelInterface {
     return this
   }
 
-  async update(): Promise<void> {
+  async update(assignment: AssignmentModelInterface = this): Promise<void> {
     const result = this.db.prepare(`
       UPDATE assignments SET ticket_id = ?, agent_id = ?, status = ?, assigned_at = ?, completed_at = ?
       WHERE id = ?
-    `).run(this.ticketId, this.agentId, this.status, this.assignedAt, this.completedAt, this.id)
-    if (result.changes !== 1) throw new Error(`Assignment ${this.id} was not found`)
+    `).run(assignment.ticketId, assignment.agentId, assignment.status, assignment.assignedAt, assignment.completedAt, assignment.id)
+    if (result.changes !== 1) throw new Error(`Assignment ${assignment.id} was not found`)
   }
 
   async delete(): Promise<void> {

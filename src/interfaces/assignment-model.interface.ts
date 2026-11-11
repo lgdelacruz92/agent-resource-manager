@@ -10,6 +10,6 @@ export interface AssignmentData {
 export interface AssignmentModelInterface extends AssignmentData {
   get(): Promise<AssignmentData | null>
   create(): Promise<AssignmentModelInterface>
-  update(): Promise<void>
+  update(assignment?: AssignmentModelInterface): Promise<void>
   delete(): Promise<void>
 }
