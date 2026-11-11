@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite"
-import type { AssignmentModelInterface } from "../interfaces/assignment-model.interface.js"
+import type { AssignmentData, AssignmentModelInterface } from "../interfaces/assignment-model.interface.js"
 
 export class AssignmentModel implements AssignmentModelInterface {
   id: number
@@ -9,7 +9,7 @@ export class AssignmentModel implements AssignmentModelInterface {
   assignedAt: string
   completedAt: string | null
 
-  constructor(private readonly db: DatabaseSync, assignment: AssignmentModelInterface) {
+  constructor(private readonly db: DatabaseSync, assignment: AssignmentData) {
     this.id = assignment.id
     this.ticketId = assignment.ticketId
     this.agentId = assignment.agentId
@@ -18,7 +18,7 @@ export class AssignmentModel implements AssignmentModelInterface {
     this.completedAt = assignment.completedAt
   }
 
-  async get(): Promise<AssignmentModelInterface | null> {
+  async get(): Promise<AssignmentData | null> {
     const row = this.db.prepare("SELECT id, ticket_id, agent_id, status, assigned_at, completed_at FROM assignments WHERE id = ?").get(this.id)
     if (!row) return null
     if (typeof row.id !== "number" || !Number.isSafeInteger(row.id)

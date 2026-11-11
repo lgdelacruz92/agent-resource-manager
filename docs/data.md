@@ -2,7 +2,7 @@
 
 Estimated reading time: 8 minutes (150 WPM)
 
-This is the working shared-data design. Both apps now implement their sides of the shared execution and lock integration; actual deployed API compatibility still needs controlled verification. See the [sequence diagram](sequence-diagram.md).
+This is the working shared-data design. The Resource Manager has been refactored to domain collections and models; its new flow has not been verified against deployed services. The [sequence diagram](sequence-diagram.md) describes the earlier flow and may differ from current code.
 
 ## Executions
 
@@ -55,7 +55,7 @@ If that session is busy, watch it rather than immediately sending another prompt
 
 If that session is idle, resend the work request to the same session. Earlier unrecorded work may already have finished, so the user accepts that this can repeat work. Record the new request according to the attempt-counting rule.
 
-If OpenCode reports that the saved session no longer exists and `work_requested_at` is empty, mark the old execution `failed` with a missing-session reason. Create a new execution record and session, then send the work there. Keep the old record and session ID for debugging; it does not count as an attempt. An unreachable agent or an unknown session state is not the same as a confirmed missing session.
+If OpenCode reports that the saved session no longer exists and `work_requested_at` is empty, the simplified manager marks the execution `failed` and moves the ticket to `Retry` before releasing the assignment. It does not count as an attempt. An unreachable agent or an unknown session state is not the same as a confirmed missing session.
 
 If the saved session is confirmed missing and `work_requested_at` is recorded, mark the attempt failed and move the ticket toward `Retry`. The recorded request counts toward the attempt limit. Assignment release still requires completion coordination.
 
@@ -75,7 +75,7 @@ The user decided a human is responsible for prepopulating the `agents` table and
 
 ## Completion coordination
 
-The Resource Manager holds the shared lock while moving a ticket to `Done` or `Retry` and marking the assignment complete in SQLite. The Ticket Scheduler holds the same lock across its board fetch, ticket sync, and scheduling pass. This prevents an overlapping scheduler pass from using an older board fetch as the assignment is released.
+The Resource Manager holds the shared lock while checking the live board for `Done` after a successful execution, or moving a failed ticket to `Retry`, and marking the assignment complete in SQLite. It does not move successful work to `Done`; an external actor does that. The Ticket Scheduler holds the same lock across its board fetch, ticket sync, and scheduling pass. This prevents an overlapping scheduler pass from using an older board fetch as the assignment is released.
 
 Both apps use the protocol, and Vikunja reads must reflect confirmed moves. Keep the assignment reserved when safe completion cannot be established.
 
@@ -83,9 +83,9 @@ If the shared lock is already held, the app skips the coordinated work and retri
 
 To acquire the lock, an app atomically inserts a row with the lock name and a unique owner token. The lock name is unique, so only one app can acquire it at a time. To release it, the app deletes the row only when both the name and owner token match. A potentially stale lock is left for human review, not automatically removed.
 
-If the final Vikunja card move fails or its result is uncertain, the Resource Manager keeps the assignment reserved, releases the lock, and retries the move later.
+If the board check or Retry move fails or is uncertain, the Resource Manager keeps the assignment reserved, releases the lock, and retries later. A successful assignment also remains reserved if the agent is busy, unreachable, unknown, or flagged for review.
 
-If the card move succeeds but marking the assignment complete fails, leave the card in its final column and retry the database completion later under the shared lock. If the database result is uncertain, inspect the assignment before retrying.
+If the Retry move succeeds but marking the assignment complete fails, leave the card in its final column and retry the database completion later under the shared lock. If the database result is uncertain, inspect the assignment before retrying.
 
 ## Details to discuss
 

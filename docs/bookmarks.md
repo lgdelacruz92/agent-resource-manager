@@ -1,16 +1,12 @@
 # Resource Manager bookmark
 
-Estimated reading time: 9 minutes (150 WPM)
+Estimated reading time: 6 minutes (150 WPM)
 
 ## Current task
 
-- `AssignmentModel` takes a SQLite connection and implements direct database `get`, `create`, `update`, and `delete`; deletion is blocked if executions refer to it. CRUD methods are not declared on `AssignmentModelInterface`. Targeted lint and isolated typecheck pass; project typecheck still has unrelated refactor errors. No tests or live database operations were performed.
-- Implemented `Executions.create(assignment)` as in-memory creation with a local ID and `starting` status; it does not persist to SQLite. The existing `getLatest` returns an uninitialized field and does not see created executions. Targeted lint passes; project typecheck still reports in-progress refactor errors.
-- `Assignments.create(ticket, agent)` now calls `AssignmentModel.create` to insert into SQLite before appending and returning the model. `Assignments` requires a database connection. Targeted lint and isolated typecheck pass; no tests or live database operations were performed.
-- Added `ExecutionModelInterface`, `ExecutionsInterface`, and `Executions` using the assignment collection pattern. `find` searches by execution ID; latest-by-assignment lookup and reconciler integration are not implemented. Targeted lint passes; project typecheck still fails in the in-progress reconciler refactor. No tests written or changed.
-- User is refactoring toward collection and model interfaces. Added `TicketModelInterface`, `TicketsInterface`, and `Tickets`; the user wired `Tickets` into the reconciler. Added `AssignmentModelInterface`, `AssignmentsInterface`, and `Assignments` with the same `find` and `list` pattern; `list` does not filter completed assignments. Targeted lint passes, but project typecheck fails on the existing reconciler refactor and constructor wiring. User asked to defer the `find` concern and not write tests unless explicitly requested.
-- `src/components/agent-model.ts` began as a dummy; the user has since added a database-backed `update`. Its fields still have placeholder defaults, and the earlier dummy-test and verification results predate that change.
-- User is refactoring `src/components/agents.ts` around agent models. Updated `test/dummy-agents.test.ts` to test listing, targeted updates, missing IDs, and asynchronous model updates. Three tests pass and two fail: `Agents.update` neither waits for the model update nor propagates its rejection. Lint and source typecheck pass; implementation was left unchanged.
+- Refactored the manager to inject SQLite-backed `Agents`, `Tickets`, `Assignments`, and `Executions`; individual agent, assignment, and execution models handle their own writes. The reconciler uses the existing assignment and its latest execution; the older broad database class is no longer wired into the manager.
+- User chose manager-monitored executions, In progress when work is sent, direct Vikunja confirmation of Done before successful release, and Retry on failure. The manager retains reservations if safe completion cannot be established and coordinates completion under the scheduler lock.
+- Lint, typecheck, and build pass. No tests were written or run, and no services or live database were started. The refactored flow, board pagination assumptions, and deployed API compatibility remain unverified; do not treat previous tests as coverage of the new implementation.
 - A dummy implementation means empty methods or minimal type-compatible returns, without real behavior or state. The convention is recorded in `AGENTS.md`.
 - Explained the `async` parsing error in `src/interfaces/agents-manager.interface.ts`: remove `async` from the interface declaration and keep the `Promise<Agent[]>` return type. No source changes requested.
 - Explained `compilerOptions.types`: adding `node` includes Node globals from `@types/node`. This project already has that package and no explicit `types` list.
@@ -19,31 +15,24 @@ Estimated reading time: 9 minutes (150 WPM)
 
 ## Previous task: board-driven completion
 
-- User proposes no review stage in the manager: another app may handle review later. The manager would use a ticket previously In progress and now in Vikunja Done as the assignment-completion signal. This is discussion only; trigger details, failure handling, and edge cases remain open.
+- User chose no review stage in the manager: another app may handle review later. The refactored manager waits for an externally moved Done card after a successful execution; this behavior has not been verified against deployed services.
 - Refactored `_reconcile` in `src/components/assignment-reconciler.ts` into shorter, descriptive private methods for starting, recovering, and monitoring work. Lint, typecheck, and all 57 tests passed.
 - Discussed its flow: it reads the latest execution; most failures are finalized for scheduler retry, while a session missing before work was requested can lead to a new execution directly. A missing URL leaves the assignment reserved.
 - User prefers short, readable functions whose names explain what they do.
 - ESLint requires TypeScript private class methods to start with `_`. Use `npm run lint`.
 - npm audit reports a moderate minimatch advisory in the linting dependencies; ESLint 10 does not support Node 23.
 
-## Resume: board-driven completion gaps
+## Board-driven completion decisions and remaining risks
 
-Discuss these before implementing the proposed Done signal:
-
-1. **Missed In progress:** The manager currently records `in_progress` only after observing the agent busy. Fast work can finish between checks, so an assignment might never get that record. Decide when to record it.
-2. **Manager currently moves Done:** An idle agent currently leads to a successful execution, a move to Done, and assignment completion. Change this flow so the manager does not trigger its own completion signal.
-3. **Trust in Done:** Anyone able to move a card to Done could trigger completion, even by mistake or before a merge. Decide whether the board alone is authoritative.
-4. **Failures and races:** Decide whether timeouts and unreachable agents still move tickets to Retry, and what wins if Done and a failure occur around the same time.
-5. **Agent availability:** A ticket could be Done while its agent is busy or unreachable. Decide separately when to complete the assignment and when to make the agent available.
-6. **Board freshness and outages:** The scheduler copies board status to the database; the manager does not directly check the current column. Decide how to obtain a trustworthy status and what happens when it is stale or unavailable.
-
-**Next discussion:** Should an assignment count as In progress as soon as work is sent, even if the manager never sees the agent busy? Discuss one decision at a time. No implementation authorized yet.
+- In progress is recorded after the work request, with board movement and assignment update coordinated under the lock. Successful completion checks the live board rather than relying on the scheduler's copy.
+- Anyone who can move a card to Done can affect completion; the manager does not verify a PR merge. It also requires the agent to be idle and not flagged for review before release.
+- Failed executions take the Retry path, including when Done is also visible. Board/API failures or uncertain agent availability retain the reservation. If a card reaches Done before In progress is recorded, the manager will not move it back and keeps the assignment reserved for review. Pagination and races with human board edits still need real-world verification.
 
 ## Previous task: PR merge policy
 
 - Earlier direction: keep the worker reserved while its PR awaits review or merge; session idleness does not mean the worker is available. The user now proposes the manager observe the ticket's Done column instead of managing review or checking how it was completed.
 - For the proof of concept, a person manually gives the worker PR review feedback. Automation can be considered later if the concept is proven; it is deferred.
-- Created [manual-done.md](../manual-done.md) as a human procedure for moving the ticket to Done, completing the execution and assignment, and setting the agent idle after a merge. The scheduler requires both idle status and no incomplete assignment. Current manager behavior can release the worker before merge, so the procedure requires stopping it while waiting. PR tracking and other outcomes are not yet specified.
+- [manual-done.md](../manual-done.md) describes the older manual procedure. The refactored manager now waits for an external Done move; its new behavior and this procedure have not been verified together.
 
 ## Previous task: first test run
 
@@ -52,7 +41,7 @@ Discuss these before implementing the proposed Done signal:
 
 ## Before real dispatch
 
-- Verify the OpenCode session routes, response shapes, readiness timestamps, and Vikunja task and card operations against controlled deployments. Tests currently use fakes, not deployed services.
+- Verify the OpenCode session routes, response shapes, readiness timestamps, and Vikunja task and card operations against controlled deployments. The new flow has not been verified against deployed services.
 - Fast tasks can be detected from a newer completed busy/idle interval compared with the pre-prompt baseline. If timestamps are absent or do not advance, the manager still cannot recognize a task missed between polls; it waits or reaches the configured timeout. Restart accepts recorded work with an idle, ready session as successful, per the agreed recovery rule.
 - Decide an execution timeout value. `RESOURCE_MANAGER_EXECUTION_TIMEOUT_MS` is optional and has no default.
 - Document human recovery steps for stale locks. The manager logs locks older than two minutes, but neither `resource-manager-pass` nor `ticket-scheduling` is cleared automatically after a crash.
@@ -60,5 +49,5 @@ Discuss these before implementing the proposed Done signal:
 
 ## Verification already done
 
-- Controlled tests cover fast-task timestamps, startup, recovery, missing sessions, uncertain prompts, failures, completion retries, lock contention, and the scheduler's retry limit against a shared in-memory database.
+- The earlier implementation had controlled tests for startup, recovery, failures, and locking; those test files were removed and do not verify the refactored flow.
 - The manager and scheduler have not been tested together against deployed OpenCode and Vikunja services.

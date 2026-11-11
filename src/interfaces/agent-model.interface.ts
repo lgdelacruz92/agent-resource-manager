@@ -1,8 +1,10 @@
-export interface AgentModelInterface {
-    id: number
-    name: string
-    status: 'busy' | 'unreachable'
-    url: string
+export interface AgentData {
+  id: number
+  name: string
+  status: string
+  url: string | null
+}
 
-    update(status: string): Promise<void>
+export interface AgentModelInterface extends AgentData {
+  update(status: string): Promise<void>
 }

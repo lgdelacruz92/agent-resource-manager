@@ -1,13 +1,13 @@
-// Turns reserved assignments into sessions and coordinates their final release.
-import { AgentModelInterface } from "../interfaces/agent-model.interface.js";
-import { AgentsInterface } from "../interfaces/agents.interface.js";
-import { AssignmentModelInterface } from "../interfaces/assignment-model.interface.js";
-import { AssignmentsInterface } from "../interfaces/assignments.interface.js";
-import { ExecutionsInterface } from "../interfaces/executions.interface.js";
+// Coordinates assignments without accessing the database directly.
+import type { AgentModelInterface } from "../interfaces/agent-model.interface.js"
+import type { AgentsInterface } from "../interfaces/agents.interface.js"
+import type { AssignmentModelInterface } from "../interfaces/assignment-model.interface.js"
+import type { AssignmentsInterface } from "../interfaces/assignments.interface.js"
+import type { ExecutionModelInterface } from "../interfaces/execution-model.interface.js"
+import type { ExecutionsInterface } from "../interfaces/executions.interface.js"
 import type { OpencodeAgentClientInterface, OpencodeSessionActivity } from "../interfaces/opencode-agent-client.interface.js"
-import type { Agent, Assignment, Execution, ResourceManagerDatabaseInterface, Ticket } from "../interfaces/resource-manager-database.interface.js"
-import { TicketModelInterface } from "../interfaces/ticket-model.interface.js";
-import { TicketsInterface } from "../interfaces/tickets.interface.js";
+import type { TicketModelInterface } from "../interfaces/ticket-model.interface.js"
+import type { TicketsInterface } from "../interfaces/tickets.interface.js"
 import type { VikunjaInterface, VikunjaTask } from "../interfaces/vikunja.interface.js"
 
 interface Lock {
@@ -16,7 +16,7 @@ interface Lock {
 }
 
 export class AssignmentReconciler {
-  // Compare later activity with the session's busy time immediately before the prompt.
+  // A pre-prompt baseline prevents treating an old idle session as completed work.
   private readonly locallySent = new Map<number, number | null>()
 
   constructor(
@@ -29,11 +29,11 @@ export class AssignmentReconciler {
     private readonly createClient: (url: string) => OpencodeAgentClientInterface,
     private readonly timeoutMs: number | null = null,
     private readonly now: () => Date = () => new Date(),
-  ) { }
+  ) {}
 
   async runOnce(): Promise<void> {
     const errors: unknown[] = []
-    for (const assignment of await this.assignments.list()) {
+    for (const assignment of await this.assignments.listIncomplete()) {
       try {
         const agent = this.agents.find(assignment.agentId)
         const ticket = this.tickets.find(assignment.ticketId)
@@ -47,215 +47,207 @@ export class AssignmentReconciler {
     if (errors.length) throw new AggregateError(errors, "One or more assignments could not be reconciled")
   }
 
-  private async _reconcile(assignment: AssignmentModelInterface,
-                          ticket: TicketModelInterface,
-                          agent: AgentModelInterface): Promise<void> {
-    const execution = this.executions.getLatest();
+  private async _reconcile(assignment: AssignmentModelInterface, ticket: TicketModelInterface, agent: AgentModelInterface): Promise<void> {
+    const execution = this.executions.getLatest(assignment.id)
+    if (execution?.status === "failed") {
+      await this._finishAssignment(assignment, ticket, agent, "failed")
+      return
+    }
+    if (execution?.status === "succeeded") {
+      await this._finishAssignment(assignment, ticket, agent, "succeeded")
+      return
+    }
+    if (!agent.url) throw new Error(`Agent ${agent.id} has no URL; assignment remains reserved`)
+    const client = this.createClient(agent.url)
     if (!execution) {
-      await this._startExecution(assignment, ticket, agent)
+      const task = await this.vikunja.getTask(ticket.vikunjaTaskId)
+      const created = await this.executions.create(assignment)
+      await this._startSession(assignment, ticket, created, agent, client, task)
       return
     }
-
-    // Already an execution processing
-    if (execution.status === 'starting' || execution.status === 'running') {
+    if (!execution.sessionId) {
+      if (execution.workRequestedAt !== null) throw new Error(`Execution ${execution.id} has a recorded request but no session ID`)
+      const task = await this.vikunja.getTask(ticket.vikunjaTaskId)
+      await this._startSession(assignment, ticket, execution, agent, client, task)
       return
     }
-
-    // this means failed execution
-    if (execution.status === 'failed') {
-      // move to retry
-      return
-    }
-
-    // handle succeeded
-
+    await this._monitor(assignment, ticket, agent, execution, client)
   }
 
-  private async _startExecution(ticket: TicketModelInterface, agent: AgentModelInterface): Promise<void> {
-    // A failed fetch does not create an execution or count as an attempt.
-    const task = await this.vikunja.getTask(ticket.vikunjaTaskId)
-    const assignment = await this.assignments.create(ticket, agent);
-    await this.executions.create(assignment)
-    const execution = await this.database.createExecution(assignment.id, this._timestamp())
-    if (await this._agentReadyForSession(agent, execution, client)) await this._createSessionAndSend(execution, task, client)
-  }
-
-  private async _recoverExecutionWithoutSession(execution: Execution, ticket: Ticket, agent: Agent, client: OpencodeAgentClientInterface): Promise<void> {
-    if (execution.workRequestedAt !== null) throw new Error(`Execution ${execution.id} has a recorded request but no session ID`)
-    if (!await this._agentReadyForSession(agent, execution, client)) return
-    const task = await this.vikunja.getTask(ticket.vikunjaTaskId)
-    await this._createSessionAndSend(execution, task, client)
-  }
-
-  private async _agentReadyForSession(agent: Agent, execution: Execution, client: OpencodeAgentClientInterface): Promise<boolean> {
-    if (agent.status === "needs_review") {
-      await this._fail(execution, client, "agent needs review")
-      return false
-    }
+  private async _startSession(assignment: AssignmentModelInterface, ticket: TicketModelInterface, execution: ExecutionModelInterface, agent: AgentModelInterface, client: OpencodeAgentClientInterface, task: VikunjaTask): Promise<void> {
+    if (agent.status === "needs_review") return
     const state = await client.state()
-    if (state === "unreachable") await this._failUnreachableAgent(agent, execution, client)
-    return state === "idle"
-  }
-
-  private async _createSessionAndSend(execution: Execution, task: VikunjaTask, client: OpencodeAgentClientInterface): Promise<void> {
-    const sessionId = await client.createSession(task.title)
-    await this.database.saveSession(execution.id, sessionId)
-    await this._send(execution.id, sessionId, task.title, task.description, client)
-  }
-
-  private async _reconcileSession(assignment: Assignment, ticket: Ticket, agent: Agent, execution: Execution, sessionId: string, client: OpencodeAgentClientInterface): Promise<void> {
-    const activity = await client.sessionActivity(sessionId)
-    const state = activity.state
     if (state === "unreachable") {
-      await this._failUnreachableAgent(agent, execution, client)
+      await this._fail(execution, agent, client, "agent unreachable", true)
       return
     }
-    if (state === "missing") {
-      await this._handleMissingSession(agent, execution, client)
+    if (state !== "idle") return
+    execution.sessionId = await client.createSession(task.title)
+    await execution.update()
+    await this._send(assignment, ticket, agent, execution, client, task)
+  }
+
+  private async _send(assignment: AssignmentModelInterface, ticket: TicketModelInterface, agent: AgentModelInterface, execution: ExecutionModelInterface, client: OpencodeAgentClientInterface, task: VikunjaTask): Promise<void> {
+    if (!execution.sessionId) throw new Error(`Execution ${execution.id} has no session`)
+    const activity = await client.sessionActivity(execution.sessionId)
+    if (activity.state !== "idle") throw new Error(`Cannot send to session ${execution.sessionId}: state is ${activity.state}`)
+    this.locallySent.set(execution.id, activity.busyAt)
+    console.log(`Sending work for execution ${execution.id}, session ${execution.sessionId}`)
+    let promptError: unknown
+    let promptFailed = false
+    try {
+      await client.prompt(execution.sessionId, `${task.title}\n\n${task.description}`)
+    } catch (error) {
+      promptFailed = true
+      promptError = error
+    }
+    try {
+      // A sent but uncertain request counts once this timestamp is recorded.
+      execution.workRequestedAt = this._timestamp()
+      await execution.update()
+      await this._markInProgress(assignment, ticket, agent)
+    } catch (error) {
+      if (promptFailed) throw new AggregateError([promptError, error], "Prompt and progress recording failed", { cause: error })
+      throw error
+    }
+    if (promptFailed) throw promptError
+  }
+
+  private async _monitor(assignment: AssignmentModelInterface, ticket: TicketModelInterface, agent: AgentModelInterface, execution: ExecutionModelInterface, client: OpencodeAgentClientInterface): Promise<void> {
+    if (!execution.sessionId) throw new Error(`Execution ${execution.id} has no session`)
+    const activity = await client.sessionActivity(execution.sessionId)
+    if (activity.state === "unreachable") {
+      await this._fail(execution, agent, client, "agent unreachable", true)
       return
     }
-    if (state === "unknown") return
+    if (activity.state === "missing") {
+      await this._fail(execution, agent, client, "session missing", false)
+      return
+    }
+    if (activity.state === "unknown") return
     if (execution.workRequestedAt === null) {
-      if (state === "idle") await this._sendPendingWork(ticket, agent, execution, sessionId, client)
+      if (activity.state === "idle" && agent.status !== "needs_review") {
+        await this._send(assignment, ticket, agent, execution, client, await this.vikunja.getTask(ticket.vikunjaTaskId))
+      }
       return
     }
-    await this._monitorRequestedWork(assignment, ticket, agent, execution, activity, client)
-  }
-
-  private async _handleMissingSession(agent: Agent, execution: Execution, client: OpencodeAgentClientInterface): Promise<void> {
-    if (agent.status === "busy" && await client.state() === "idle") await this.database.updateAgentStatus(agent.id, "idle")
-    const reason = execution.workRequestedAt ? "missing session after work request" : "missing session before work request"
-    await this._fail(execution, client, reason)
-  }
-
-  private async _sendPendingWork(ticket: Ticket, agent: Agent, execution: Execution, sessionId: string, client: OpencodeAgentClientInterface): Promise<void> {
-    if (agent.status === "needs_review") {
-      await this._fail(execution, client, "agent needs review")
-      return
-    }
-    const task = await this.vikunja.getTask(ticket.vikunjaTaskId)
-    await this._send(execution.id, sessionId, task.title, task.description, client)
-  }
-
-  private async _monitorRequestedWork(assignment: Assignment, ticket: Ticket, agent: Agent, execution: Execution, activity: OpencodeSessionActivity, client: OpencodeAgentClientInterface): Promise<void> {
-    const requestedAt = Date.parse(execution.workRequestedAt ?? "")
+    if (!await this._markInProgress(assignment, ticket, agent)) return
+    const requestedAt = Date.parse(execution.workRequestedAt)
     if (!Number.isFinite(requestedAt)) throw new Error(`Execution ${execution.id} has an invalid work request time`)
     const finishedNewWork = this._hasFinishedNewWork(execution.id, activity)
     if (this.timeoutMs !== null && (activity.state === "busy" || (this.locallySent.has(execution.id) && !finishedNewWork))
       && this.now().getTime() - requestedAt >= this.timeoutMs) {
-      await this.database.updateAgentStatus(agent.id, "needs_review")
-      await this._fail(execution, client, "execution timed out")
+      await this._fail(execution, agent, client, "execution timed out", true)
       return
     }
     if (activity.state === "busy") {
-      await this._markWorkInProgress(assignment, ticket, agent, execution)
+      this.locallySent.delete(execution.id)
+      if (execution.status === "starting") {
+        execution.status = "running"
+        execution.startedAt ??= this._timestamp()
+        await execution.update()
+      }
       return
     }
     if (this.locallySent.has(execution.id)) {
       if (!finishedNewWork) return
       this.locallySent.delete(execution.id)
     }
-    // After a restart there is no local baseline; the agreed rule accepts idle and ready.
-    await this._finishIfAgentIdle(agent, execution, client)
+    // On restart there is no local baseline; idle and ready is accepted.
+    const state = await client.state()
+    if (state === "unreachable") {
+      await this._fail(execution, agent, client, "agent unreachable", true)
+    } else if (state === "idle") {
+      execution.status = "succeeded"
+      execution.finishedAt = this._timestamp()
+      await execution.update()
+    }
   }
 
-  private _hasFinishedNewWork(executionId: number, activity: OpencodeSessionActivity): boolean {
-    // A newer busy/idle interval proves work happened between polls; old activity does not.
-    const previousBusy = this.locallySent.get(executionId) ?? null
-    return this.locallySent.has(executionId) && activity.busyAt !== null && activity.idleAt !== null
+  private _hasFinishedNewWork(id: number, activity: OpencodeSessionActivity): boolean {
+    const previousBusy = this.locallySent.get(id) ?? null
+    return this.locallySent.has(id) && activity.busyAt !== null && activity.idleAt !== null
       && (previousBusy === null || activity.busyAt > previousBusy) && activity.idleAt >= activity.busyAt
   }
 
-  private async _markWorkInProgress(assignment: Assignment, ticket: Ticket, agent: Agent, execution: Execution): Promise<void> {
+  private async _markInProgress(assignment: AssignmentModelInterface, ticket: TicketModelInterface, agent: AgentModelInterface): Promise<boolean> {
+    if (assignment.status === "in_progress") {
+      if (agent.status === "idle") await agent.update("busy")
+      return true
+    }
+    return this._withLock(async () => {
+      const current = this.assignments.find(assignment.id)
+      if (!current || current.completedAt !== null) return false
+      if (current.status !== "in_progress") {
+        // Do not move a missing or externally completed card back into progress.
+        const column = await this.vikunja.getTaskColumn(ticket.vikunjaTaskId)
+        if (column === null || column === "Done") return false
+        await this.vikunja.moveToColumn(ticket.vikunjaTaskId, "In progress")
+        current.status = "in_progress"
+        await current.update()
+      }
+      if (agent.status === "idle") await agent.update("busy")
+      assignment.status = "in_progress"
+      return true
+    })
+  }
+
+  private async _fail(execution: ExecutionModelInterface, agent: AgentModelInterface, client: OpencodeAgentClientInterface, reason: string, review: boolean): Promise<void> {
+    if (review) await agent.update("needs_review")
+    execution.status = "failed"
+    execution.finishedAt = this._timestamp()
+    execution.failureReason = reason
+    await execution.update()
     this.locallySent.delete(execution.id)
-    if (execution.status === "starting") await this.database.markRunning(execution.id, this._timestamp())
-    if (agent.status === "idle") await this.database.updateAgentStatus(agent.id, "busy")
-    if (assignment.status !== "in_progress") {
-      await this.vikunja.moveToColumn(ticket.vikunjaTaskId, "In progress")
-      await this.database.updateAssignmentStatus(assignment.id, "in_progress")
+    if (execution.sessionId && reason !== "session missing") {
+      try { await client.abort(execution.sessionId) } catch (error) { console.error(`Could not stop session ${execution.sessionId}:`, error) }
     }
   }
 
-  private async _finishIfAgentIdle(agent: Agent, execution: Execution, client: OpencodeAgentClientInterface): Promise<void> {
-    // A session can be idle while another session on the same server is still busy.
-    const agentState = await client.state()
-    if (agentState === "unreachable") {
-      await this._failUnreachableAgent(agent, execution, client)
-    } else if (agentState === "idle") {
-      await this.database.finishExecution(execution.id, "succeeded", this._timestamp(), null)
-      if (agent.status === "busy") await this.database.updateAgentStatus(agent.id, "idle")
-    }
+  private async _finishAssignment(assignment: AssignmentModelInterface, ticket: TicketModelInterface, agent: AgentModelInterface, outcome: "succeeded" | "failed"): Promise<void> {
+    await this._withLock(async () => {
+      const current = this.assignments.find(assignment.id)
+      if (!current || current.completedAt !== null) return false
+      if (outcome === "succeeded") {
+        if (current.status !== "in_progress" || await this.vikunja.getTaskColumn(ticket.vikunjaTaskId) !== "Done") return false
+        if (!agent.url || agent.status === "needs_review") return false
+        const state = await this.createClient(agent.url).state()
+        if (state === "unreachable") await agent.update("needs_review")
+        if (state !== "idle") return false
+        if (agent.status !== "idle") await agent.update("idle")
+      } else {
+        if (agent.status !== "needs_review") {
+          if (!agent.url) return false
+          const state = await this.createClient(agent.url).state()
+          if (state === "unknown") return false
+          if (state === "unreachable") await agent.update("needs_review")
+          if (state === "busy" && agent.status !== "busy") await agent.update("busy")
+          if (state === "idle" && agent.status !== "idle") await agent.update("idle")
+        }
+        await this.vikunja.moveToColumn(ticket.vikunjaTaskId, "Retry")
+      }
+      current.status = outcome
+      current.completedAt = this._timestamp()
+      await current.update()
+      return true
+    })
   }
 
-  private async _failUnreachableAgent(agent: Agent, execution: Execution, client: OpencodeAgentClientInterface): Promise<void> {
-    await this.database.updateAgentStatus(agent.id, "needs_review")
-    await this._fail(execution, client, "agent unreachable")
-  }
-
-  private async _handleFinishedExecution(assignment: Assignment, ticket: Ticket, agent: Agent, execution: Execution | null): Promise<boolean> {
-    if (!execution) return false
-    if (execution.status === "failed" && execution.failureReason === "missing session before work request") return false
-    if (execution.status !== "succeeded" && execution.status !== "failed") return false
-
-    if (execution.status === "succeeded" && agent.status === "busy" && agent.url) {
-      const state = await this.createClient(agent.url).state()
-      if (state === "idle") await this.database.updateAgentStatus(agent.id, "idle")
-      if (state === "unreachable") await this.database.updateAgentStatus(agent.id, "needs_review")
-    }
-    if (execution.status === "failed" && execution.sessionId && agent.url
-      && (execution.failureReason === "agent unreachable" || execution.failureReason === "execution timed out")) {
-      await this._tryAbort(this.createClient(agent.url), execution.sessionId)
-    }
-    await this._complete(assignment, ticket, execution)
-    return true
-  }
-
-  private async _send(id: number, sessionId: string, title: string, description: string, client: OpencodeAgentClientInterface): Promise<void> {
-    const activity = await client.sessionActivity(sessionId)
-    if (activity.state !== "idle") throw new Error(`Cannot send to session ${sessionId}: state is ${activity.state}`)
-    console.log(`Sending work for execution ${id}, session ${sessionId}`)
-    this.locallySent.set(id, activity.busyAt)
-    try {
-      await client.prompt(sessionId, `${title}\n\n${description}`)
-    } finally {
-      // Even an uncertain response counts once the request was sent and recorded.
-      await this.database.recordWorkRequest(id, this._timestamp())
-    }
-  }
-
-  private async _fail(execution: Execution, client: OpencodeAgentClientInterface, reason: string): Promise<void> {
-    await this.database.finishExecution(execution.id, "failed", this._timestamp(), reason)
-    this.locallySent.delete(execution.id)
-    if (execution.sessionId && reason !== "missing session before work request" && reason !== "missing session after work request") {
-      await this._tryAbort(client, execution.sessionId)
-    }
-  }
-
-  private async _tryAbort(client: OpencodeAgentClientInterface, sessionId: string): Promise<void> {
-    try { await client.abort(sessionId) } catch (error) { console.error(`Could not stop session ${sessionId}:`, error) }
-  }
-
-  private async _complete(assignment: Assignment, ticket: Ticket, execution: Execution): Promise<void> {
+  private async _withLock(action: () => Promise<boolean>): Promise<boolean> {
     const owner = await this.lock.tryAcquire()
-    if (!owner) return
-    let completionError: unknown
+    if (!owner) return false
+    let actionError: unknown
     try {
-      const current = await this.database.getAssignment(assignment.id)
-      if (!current) throw new Error(`Assignment ${assignment.id} no longer exists`)
-      if (current.completedAt !== null) return
-      await this.vikunja.moveToColumn(ticket.vikunjaTaskId, execution.status === "succeeded" ? "Done" : "Retry")
-      await this.database.updateAssignmentStatus(assignment.id, execution.status)
-      await this.database.completeAssignment(assignment.id, this._timestamp())
+      return await action()
     } catch (error) {
-      completionError = error
+      actionError = error
       throw error
     } finally {
       try {
         await this.lock.release(owner)
       } catch (error) {
-        // Surface release failures, including both errors if completion also failed.
         // eslint-disable-next-line no-unsafe-finally, preserve-caught-error
-        if (completionError !== undefined) throw new AggregateError([completionError, error], "Completion and lock release failed")
+        if (actionError !== undefined) throw new AggregateError([actionError, error], "Action and lock release failed")
         // eslint-disable-next-line no-unsafe-finally
         throw error
       }

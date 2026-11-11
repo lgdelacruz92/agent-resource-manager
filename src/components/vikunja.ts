@@ -54,6 +54,54 @@ export class Vikunja implements VikunjaInterface {
     return { id: taskId, title: task.title, description: task.description }
   }
 
+  async getTaskColumn(taskId: number): Promise<string | null> {
+    if (!positiveInteger(taskId)) throw new Error("Vikunja task ID must be a positive integer")
+    const base = `/api/v1/projects/${this.options.projectId}/views/${this.options.viewId}`
+    const seen = new Map<number, Set<number>>()
+    const titles = new Map<number, string>()
+    let firstPageIds: Set<number> | null = null
+    let found: string | null = null
+    for (let page = 1; ; page += 1) {
+      const buckets: unknown = await (await this._request(`${base}/tasks?page=${page}&per_page=50`)).json()
+      if (!Array.isArray(buckets)) throw new Error("Vikunja returned invalid board columns")
+      let more = false
+      let added = 0
+      const pageIds = new Set<number>()
+      for (const bucket of buckets) {
+        if (!isRecord(bucket) || !positiveInteger(bucket.id) || typeof bucket.title !== "string"
+          || typeof bucket.count !== "number" || !Number.isSafeInteger(bucket.count) || bucket.count < 0
+          || (bucket.tasks != null && !Array.isArray(bucket.tasks))) {
+          throw new Error("Vikunja returned invalid board columns")
+        }
+        if (pageIds.has(bucket.id)) throw new Error("Vikunja returned a duplicate board column")
+        pageIds.add(bucket.id)
+        if (titles.has(bucket.id) && titles.get(bucket.id) !== bucket.title) throw new Error("Vikunja board changed during pagination")
+        titles.set(bucket.id, bucket.title)
+        const ids = seen.get(bucket.id) ?? new Set<number>()
+        seen.set(bucket.id, ids)
+        for (const task of bucket.tasks ?? []) {
+          if (!isRecord(task) || !positiveInteger(task.id)) throw new Error("Vikunja returned an invalid board task")
+          if (!ids.has(task.id)) { ids.add(task.id); added += 1 }
+          if (task.id === taskId) {
+            if (found !== null && found !== bucket.title) throw new Error("Task appeared in multiple board columns")
+            found = bucket.title
+          }
+        }
+        if (ids.size > bucket.count) throw new Error("Vikunja board changed during pagination")
+        if (ids.size < bucket.count) more = true
+      }
+      if (firstPageIds === null) firstPageIds = pageIds
+      else if (pageIds.size !== firstPageIds.size || [...firstPageIds].some((id) => !pageIds.has(id))) {
+        throw new Error("Vikunja board changed during pagination")
+      }
+      if ([...titles.values()].filter((title) => title === "Done").length !== 1) {
+        throw new Error("Vikunja board must have exactly one Done column")
+      }
+      if (!more) return found
+      if (added === 0) throw new Error("Vikunja pagination stopped before all board tasks were returned")
+    }
+  }
+
   async moveToColumn(taskId: number, column: ResourceManagerColumn): Promise<void> {
     if (!positiveInteger(taskId)) throw new Error("Vikunja task ID must be a positive integer")
     const base = `/api/v1/projects/${this.options.projectId}/views/${this.options.viewId}`

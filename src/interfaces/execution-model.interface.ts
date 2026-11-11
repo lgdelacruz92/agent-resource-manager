@@ -1,6 +1,6 @@
-import type { ExecutionStatus } from "./resource-manager-database.interface.js"
+export type ExecutionStatus = "starting" | "running" | "succeeded" | "failed"
 
-export interface ExecutionModelInterface {
+export interface ExecutionData {
   id: number
   assignmentId: number
   sessionId: string | null
@@ -10,4 +10,9 @@ export interface ExecutionModelInterface {
   startedAt: string | null
   finishedAt: string | null
   failureReason: string | null
+}
+
+export interface ExecutionModelInterface extends ExecutionData {
+  create(): Promise<ExecutionModelInterface>
+  update(): Promise<void>
 }

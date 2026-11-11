@@ -15,6 +15,9 @@ export interface VikunjaInterface {
   // Fetch a task by its Vikunja task ID; reject if the task cannot be retrieved.
   getTask(taskId: number): Promise<VikunjaTask>
 
+  // Read the current board column; null means the task was not found.
+  getTaskColumn(taskId: number): Promise<string | null>
+
   // Move a task to the requested column; reject if the move cannot be confirmed.
   moveToColumn(taskId: number, column: ResourceManagerColumn): Promise<void>
 }

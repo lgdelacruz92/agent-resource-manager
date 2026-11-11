@@ -1,20 +1,26 @@
 // Runs agent checks and assignment reconciliation against the prepared shared database.
 import { AssignmentReconciler } from "./components/assignment-reconciler.js"
+import { Agents } from "./components/agents.js"
+import { Assignments } from "./components/assignments.js"
+import { Executions } from "./components/executions.js"
 import { OpencodeAgentClient } from "./components/opencode-agent-client.js"
 import { ResourceManager } from "./components/resource-manager.js"
-import { ResourceManagerDatabase } from "./components/resource-manager-database.js"
 import { SharedLock } from "./components/shared-lock.js"
+import { Tickets } from "./components/tickets.js"
 import { Vikunja } from "./components/vikunja.js"
 import { config } from "./config.js"
 import { openDatabase } from "./db/database.js"
 import { runProcessLoop } from "./process-loop.js"
 
 const database = openDatabase(config.databasePath)
-const sharedDatabase = new ResourceManagerDatabase(database)
+const agents = new Agents(database)
+const tickets = new Tickets(database)
+const assignments = new Assignments(database)
+const executions = new Executions(database)
 const createClient = (url: string) => new OpencodeAgentClient(url, config.opencodeHeaders)
-const agentChecks = new ResourceManager(sharedDatabase, createClient)
+const agentChecks = new ResourceManager(agents, createClient)
 const schedulingLock = new SharedLock(database)
-const assignments = new AssignmentReconciler(sharedDatabase, new Vikunja(config.vikunja), schedulingLock, createClient, config.executionTimeoutMs)
+const reconciler = new AssignmentReconciler(tickets, agents, assignments, executions, new Vikunja(config.vikunja), schedulingLock, createClient, config.executionTimeoutMs)
 const managerLock = new SharedLock(database, "resource-manager-pass")
 const manager = {
   async runOnce(): Promise<void> {
@@ -27,7 +33,7 @@ const manager = {
     }
     try {
       const errors: unknown[] = []
-      for (const pass of [agentChecks, assignments]) {
+      for (const pass of [agentChecks, reconciler]) {
         try { await pass.runOnce() } catch (error) { errors.push(error) }
       }
       if (errors.length) throw new AggregateError(errors, "Resource Manager pass failed")

@@ -4,6 +4,6 @@ import type { AssignmentModelInterface } from "./assignment-model.interface.js"
 export interface ExecutionsInterface {
   find(executionId: number): ExecutionModelInterface | undefined
   list(): Promise<ExecutionModelInterface[]>
-  getLatest(): ExecutionModelInterface | undefined
+  getLatest(assignmentId: number): ExecutionModelInterface | undefined
   create(assignment: AssignmentModelInterface): Promise<ExecutionModelInterface>
 }

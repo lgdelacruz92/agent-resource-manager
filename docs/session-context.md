@@ -1,6 +1,6 @@
 # Agent resource manager session context
 
-Estimated reading time: 22 minutes (150 WPM)
+Estimated reading time: 23 minutes (150 WPM)
 
 ## Working agreement
 
@@ -13,19 +13,19 @@ Estimated reading time: 22 minutes (150 WPM)
 
 ## Current state
 
-- The loop checks registered agents and reconciles incomplete assignments. It fetches tasks, creates and recovers sessions, records executions, reports running work, and uses the scheduler's shared lock to move final cards and release reservations. Controlled tests cover both apps with a shared in-memory database; deployed API compatibility still needs verification.
+- The manager now uses injected SQLite-backed domain collections and models instead of the broad database interface in its reconciler and agent checks. Lint, typecheck, and build pass. The new workflow has not been exercised against services or a live database; the earlier controlled tests were removed and do not verify this refactor.
 - Starting the manager can dispatch real work, change agent status, and move cards. Do not start it without a request. Unknown agent responses and missing URLs leave status unchanged; recovered agents are not automatically cleared from `needs_review`. An unchanged `idle` row may still be selected by the scheduler.
 - A separate `resource-manager-pass` lock prevents overlapping manager instances. A crash can leave that lock or `ticket-scheduling` behind; both require human review and are not cleared automatically. See [bookmark](bookmarks.md).
 - The Ticket Scheduler is a separate app. It reserves tickets and agents through incomplete assignments, implements its side of the shared lock, and enforces a configurable retry limit of three total recorded attempts by default. It does not start or monitor agents.
-- Both apps default to `../../shared-db/db.sqlite` and have independent path overrides. A human prepares the database, populates agents, and ensures their entries are valid at startup. The [fresh seed](../../shared-db/seed.sql) includes `agents.url`; an existing database's actual schema has not been verified. The example `agents.sql` inserts a frontend agent and duplicates it if rerun; neither seed nor drop should be run on a user database without authorization.
+- The apps have independent database paths and overrides; verify they point to the same file. A human prepares the database, populates agents, and ensures their entries are valid at startup. The [fresh seed](../shared-db/seed.sql) includes `agents.url`; an existing database's actual schema has not been verified. The example `agents.sql` inserts a frontend agent and duplicates it if rerun; neither seed nor drop should be run on a user database without authorization.
 
 ## Agreed directions
 
-- The user now proposes treating a Vikunja ticket's move from In progress to Done as the assignment-completion signal. The Resource Manager would not manage review; another app may handle the review cycle later. The proposed trigger, edge cases, and implementation are still being discussed; no implementation was authorized.
+- The user chose to reuse the existing assignment, have the manager monitor executions, mark work In progress when the request is recorded, and hold successful assignments until a direct Vikunja check confirms Done. Failed executions move to Retry and release the assignment under the scheduler lock. The refactored implementation is not yet verified against deployed services.
 - Fetch the full Vikunja task description before starting. If fetching fails, keep the assignment reserved, retry, and log each failure to the terminal; it is not an agent attempt. No separate alert is needed for this prototype.
 - Create an execution after fetching the task and before creating the session; save the session ID before sending work. Count an attempt only when `work_requested_at` is recorded after sending. A sent but unrecorded request does not count; the user accepts possible duplicate work. See [data design](data.md) for approved restart cases.
-- Current implementation decides execution outcomes: an agent idle and ready means success without verifying task results; too slow or unreachable means failure. It tries to stop a failed session, but retries may proceed without confirmation. It flags unreachable agents for human review. The proposed board-driven completion would change the prior success policy.
-- Current implementation moves successful work to `Done` and failed work to `Retry`. The Ticket Scheduler moves exhausted retries to `Flagged tickets`. The user's new proposal makes an external Done move the completion signal; failure handling and coordination remain to be decided.
+- An idle, ready agent is treated as execution success without verifying task results, but the assignment stays reserved until an external Done move is confirmed. Timeout or unreachable marks an execution failed; unreachable agents are flagged for human review.
+- The manager no longer moves successful work to `Done`. It moves failed work to `Retry`; the Ticket Scheduler moves exhausted retries to `Flagged tickets`.
 - Coordinate final card movement and assignment completion with the same `ticket-scheduling` database lock the Ticket Scheduler holds across board fetch, sync, and scheduling. If unavailable, retain the reservation and retry later. The manager must follow the agreed owner-token protocol and failure handling in [data design](data.md).
 
 ## Remaining work and deferred details
@@ -35,6 +35,8 @@ Estimated reading time: 22 minutes (150 WPM)
 
 ## Recent context
 
+- User requested a complete refactor in the established collection/model direction and decided: reuse the existing assignment, manager monitors execution, mark In progress when work is sent, directly check Vikunja for Done on success, and move failures to Retry. Implemented SQLite-backed collections and models, per-assignment execution lookup, app wiring, monitoring and lock-coordinated completion. Updated setup and data docs. Lint, typecheck, and build pass; no tests were written or run, and no services or live database were started. The refactored flow and deployed APIs remain unverified.
+- User asked whether I understand the direction of the last two hours of refactoring. Reviewed recent commits and current code: the apparent direction is to replace the reconciler's broad database dependency with injected domain collections and database-aware models, leaving the reconciler to coordinate the workflow. This is an interpretation for the user to confirm; the refactor is incomplete. No implementation requested.
 - User requested that `Assignments.create` use `AssignmentModel.create`. Injected `DatabaseSync` into the collection, created the model, awaited its database insert, then added it to the collection. The ID now comes from SQLite; failed inserts do not add an item. Targeted lint and isolated typecheck pass. No tests or live database operations were performed.
 - User requested direct database `get`, `create`, `update`, and `delete` methods on `AssignmentModel`. Injected `DatabaseSync`, implemented CRUD against the assignments table, and prevented deletion when executions refer to the assignment. `create` uses a database-generated ID; `get` returns data or null and does not mutate the model. These methods are on the class, not yet `AssignmentModelInterface`; `Assignments.create` remains in-memory and is not wired to the model. Targeted lint and isolated typecheck pass; project typecheck still fails on unrelated in-progress refactor errors. No tests or live database operations were performed.
 - User clarified they wanted an `AssignmentModel` class implementing `AssignmentModelInterface`. Added `src/components/assignment-model.ts`, initialized from an assignment model; it is not wired into `Assignments.create` or SQLite. Targeted lint passes. No tests written or changed.

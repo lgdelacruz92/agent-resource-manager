@@ -5,5 +5,6 @@ import type { TicketModelInterface } from "./ticket-model.interface.js"
 export interface AssignmentsInterface {
   find(assignmentId: number): AssignmentModelInterface | undefined
   list(): Promise<AssignmentModelInterface[]>
+  listIncomplete(): Promise<AssignmentModelInterface[]>
   create(ticket: TicketModelInterface, agent: AgentModelInterface): Promise<AssignmentModelInterface>
 }
