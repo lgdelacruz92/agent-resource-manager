@@ -1,6 +1,6 @@
 # Agent resource manager session context
 
-Estimated reading time: 13 minutes (150 WPM)
+Estimated reading time: 16 minutes (150 WPM)
 
 ## Working agreement
 
@@ -35,6 +35,12 @@ Estimated reading time: 13 minutes (150 WPM)
 
 ## Recent context
 
+- User requested updating the leftover dummy-agents test. Changed it to import `Agents` and check its empty placeholder behavior; the focused test passes. Full lint reports three unused parameters in `src/components/agents.ts`, and typecheck reports its uninitialized `agents` field. Left that user-edited source unchanged.
+- User clarified that a dummy implementation means empty methods or minimal type-compatible placeholder returns, not an in-memory implementation. They renamed and changed the prior implementation to `src/components/agents.ts`. Recorded the convention in project `AGENTS.md`; the earlier `test/dummy-agents.test.ts` still imports the removed implementation and was not changed.
+- User requested a dummy implementation of `AgentsInterface`. Added `DummyAgents` in `src/components/dummy-agents.ts`, an unwired in-memory implementation with optional initial agents and status updates; unknown IDs throw. Added two focused tests; lint, typecheck, and both tests passed. No database or live services were touched.
+- User asked how to fix an `async` modifier parsing error in an interface. Explained that the interface declares a Promise return type without `async`; no source changes were requested.
+- User asked whether ESLint has an automatic formatter. Explained `--fix`, its rule-based scope, and the distinction from a dedicated formatter; no configuration was changed.
+- User requested project resume. Checked the handoff, manager source, local seed, configuration, and scheduler notes; no services or implementation work were started. The board-driven completion proposal remains unimplemented. Several documentation links assume the old `agent-team/apps` layout; the scheduler is now at `../main/agent-team/apps/scheduler` relative to this project, and the local seed is `shared-db/seed.sql`. The default database path resolves outside this project to `../shared-db/db.sqlite`; `.env.local` sets an override, whose value was not inspected or verified.
 - User asked what adding `node` to `compilerOptions.types` means. Explained Node global type definitions and the allowlist; this project has `@types/node` and no explicit `types` field.
 - User asked how to check VS Code for TypeScript language support. Suggested checking its built-in TypeScript extension and TypeScript server commands; VS Code's built-in server is not necessarily an LSP server.
 - User asked whether `typescript-language-server` is installed. It was not found on PATH, in this project's npm dependencies, or in global npm packages; other installations were not ruled out.

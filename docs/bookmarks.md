@@ -1,9 +1,11 @@
 # Resource Manager bookmark
 
-Estimated reading time: 6 minutes (150 WPM)
+Estimated reading time: 7 minutes (150 WPM)
 
 ## Current task
 
+- User clarified that a dummy implementation should be empty, not an in-memory implementation. They renamed and changed it to `src/components/agents.ts`; `test/dummy-agents.test.ts` now imports it and checks its empty behavior. The focused test passes; full lint reports unused parameters, and typecheck reports an uninitialized field in `agents.ts`. The convention is recorded in `AGENTS.md`.
+- Explained the `async` parsing error in `src/interfaces/agents-manager.interface.ts`: remove `async` from the interface declaration and keep the `Promise<Agent[]>` return type. No source changes requested.
 - Explained `compilerOptions.types`: adding `node` includes Node globals from `@types/node`. This project already has that package and no explicit `types` list.
 - Discussed TypeScript language support in VS Code and the distinction between its built-in TypeScript server and an LSP-compatible server. `typescript-language-server` was not found on PATH, in the project, or in global npm packages; other installations were not ruled out.
 - Both `npm run dev` and `npm start` now load `.env.local` using `--env-file`. The manager was not started.
