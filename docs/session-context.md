@@ -1,6 +1,6 @@
 # Agent resource manager session context
 
-Estimated reading time: 21 minutes (150 WPM)
+Estimated reading time: 22 minutes (150 WPM)
 
 ## Working agreement
 
@@ -35,6 +35,10 @@ Estimated reading time: 21 minutes (150 WPM)
 
 ## Recent context
 
+- User requested that `Assignments.create` use `AssignmentModel.create`. Injected `DatabaseSync` into the collection, created the model, awaited its database insert, then added it to the collection. The ID now comes from SQLite; failed inserts do not add an item. Targeted lint and isolated typecheck pass. No tests or live database operations were performed.
+- User requested direct database `get`, `create`, `update`, and `delete` methods on `AssignmentModel`. Injected `DatabaseSync`, implemented CRUD against the assignments table, and prevented deletion when executions refer to the assignment. `create` uses a database-generated ID; `get` returns data or null and does not mutate the model. These methods are on the class, not yet `AssignmentModelInterface`; `Assignments.create` remains in-memory and is not wired to the model. Targeted lint and isolated typecheck pass; project typecheck still fails on unrelated in-progress refactor errors. No tests or live database operations were performed.
+- User clarified they wanted an `AssignmentModel` class implementing `AssignmentModelInterface`. Added `src/components/assignment-model.ts`, initialized from an assignment model; it is not wired into `Assignments.create` or SQLite. Targeted lint passes. No tests written or changed.
+- User asked to add create in the `AssignmentModelInterface` implementation. Asked whether they mean a new `AssignmentModel` class or a `create` method on each model: there is no model implementation yet, and `Assignments.create` already exists. No code changed.
 - User requested the `Executions.create` implementation. Added in-memory creation with a local ID, assignment ID, `starting` status, current timestamp, and null optional fields; it appends and returns the execution without SQLite persistence. Existing `getLatest` still returns its uninitialized field and does not see the new execution. Targeted lint passes; project typecheck still fails on in-progress refactor errors. No tests written or changed.
 - User requested `create` on `ExecutionsInterface`. Added a method accepting an assignment model and returning `Promise<ExecutionModelInterface>`, following the current reconciler call and assignment pattern. Targeted lint passes; `Executions` still needs to implement it. No tests written or changed.
 - User asked to implement `Assignments.create`. Added in-memory creation: an ID after the highest supplied ID, ticket and agent IDs, `assigned` status, current timestamp, and null completion; it appends and returns the model. It does not persist to SQLite. Targeted lint passes; project typecheck still reports unrelated in-progress refactor errors. No tests written or changed.
