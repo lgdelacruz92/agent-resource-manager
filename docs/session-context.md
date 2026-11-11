@@ -1,6 +1,6 @@
 # Agent resource manager session context
 
-Estimated reading time: 16 minutes (150 WPM)
+Estimated reading time: 17 minutes (150 WPM)
 
 ## Working agreement
 
@@ -35,6 +35,8 @@ Estimated reading time: 16 minutes (150 WPM)
 
 ## Recent context
 
+- User requested a dummy implementation of `AgentModelInterface`. Added `src/components/agent-model.ts` with placeholder field values and an empty `update` method, plus a focused test. The focused test, lint, and source typecheck pass; no real model behavior was added.
+- User requested unit tests for `Agents`. Replaced the outdated dummy test with five cases covering listing, targeted updates, missing IDs, asynchronous completion, and update failures. Three pass; two fail because `Agents.update` does not await the model update or propagate its rejection. Full lint and source typecheck pass. Left implementation unchanged.
 - User asked whether `find` throws or returns `undefined` when no item matches. Clarified that it returns `undefined`; the caller can throw explicitly. No source changes requested.
 - User asked whether `agents.ts` line 14 throws when no agent matches. Explained that `filter` returns an empty, truthy array; `find` returns `undefined` when absent. Also noted that the current agent data interface has no `update` method. No source changes requested.
 - User asked to create `AgentModelInterface` while starting an `agents.ts` refactor. Added `src/interfaces/agent-model.interface.ts` with the existing agent data fields, matching its current use as a list item; left `agents.ts` unchanged. The new interface passes targeted lint and the dummy test passes. Full lint still reports unused items in `agents.ts`; typecheck still reports its uninitialized field.

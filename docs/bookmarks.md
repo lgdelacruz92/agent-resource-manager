@@ -4,8 +4,9 @@ Estimated reading time: 7 minutes (150 WPM)
 
 ## Current task
 
-- Started the `agents.ts` refactor by creating `src/interfaces/agent-model.interface.ts`, matching the existing agent data shape. User then changed `agents.ts` to filter agents and call `update`; explained that `filter` returns a truthy empty array and the agent data interface has no `update` method. Those later edits have not been validated.
-- User clarified that a dummy implementation should be empty, not an in-memory implementation. They renamed and changed it to `src/components/agents.ts`; `test/dummy-agents.test.ts` now imports it and checks its empty behavior. The focused test passes; full lint reports unused parameters, and typecheck reports an uninitialized field in `agents.ts`. The convention is recorded in `AGENTS.md`.
+- Created `src/components/agent-model.ts` as a dummy `AgentModelInterface` implementation: placeholder fields and an empty update method. Its focused test, lint, and source typecheck pass.
+- User is refactoring `src/components/agents.ts` around agent models. Updated `test/dummy-agents.test.ts` to test listing, targeted updates, missing IDs, and asynchronous model updates. Three tests pass and two fail: `Agents.update` neither waits for the model update nor propagates its rejection. Lint and source typecheck pass; implementation was left unchanged.
+- A dummy implementation means empty methods or minimal type-compatible returns, without real behavior or state. The convention is recorded in `AGENTS.md`.
 - Explained the `async` parsing error in `src/interfaces/agents-manager.interface.ts`: remove `async` from the interface declaration and keep the `Promise<Agent[]>` return type. No source changes requested.
 - Explained `compilerOptions.types`: adding `node` includes Node globals from `@types/node`. This project already has that package and no explicit `types` list.
 - Discussed TypeScript language support in VS Code and the distinction between its built-in TypeScript server and an LSP-compatible server. `typescript-language-server` was not found on PATH, in the project, or in global npm packages; other installations were not ruled out.
