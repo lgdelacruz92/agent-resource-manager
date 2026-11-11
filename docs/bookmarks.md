@@ -4,7 +4,7 @@ Estimated reading time: 8 minutes (150 WPM)
 
 ## Current task
 
-- User is refactoring toward collection and model interfaces. Added `TicketModelInterface`, `TicketsInterface`, and `Tickets`, with a passing focused test; user asked to defer the `find` concern. `Tickets` is not wired into the reconciler. Full lint and typecheck fail on the existing in-progress reconciler refactor, including its missing database dependency and constructor wiring.
+- User is refactoring toward collection and model interfaces. Added `TicketModelInterface`, `TicketsInterface`, and `Tickets`; the user wired `Tickets` into the reconciler. Added `AssignmentModelInterface`, `AssignmentsInterface`, and `Assignments` with the same `find` and `list` pattern; `list` does not filter completed assignments. Targeted lint passes, but project typecheck fails on the existing reconciler refactor and constructor wiring. User asked to defer the `find` concern and not write tests unless explicitly requested.
 - `src/components/agent-model.ts` began as a dummy; the user has since added a database-backed `update`. Its fields still have placeholder defaults, and the earlier dummy-test and verification results predate that change.
 - User is refactoring `src/components/agents.ts` around agent models. Updated `test/dummy-agents.test.ts` to test listing, targeted updates, missing IDs, and asynchronous model updates. Three tests pass and two fail: `Agents.update` neither waits for the model update nor propagates its rejection. Lint and source typecheck pass; implementation was left unchanged.
 - A dummy implementation means empty methods or minimal type-compatible returns, without real behavior or state. The convention is recorded in `AGENTS.md`.

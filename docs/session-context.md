@@ -1,6 +1,6 @@
 # Agent resource manager session context
 
-Estimated reading time: 18 minutes (150 WPM)
+Estimated reading time: 19 minutes (150 WPM)
 
 ## Working agreement
 
@@ -35,6 +35,7 @@ Estimated reading time: 18 minutes (150 WPM)
 
 ## Recent context
 
+- User requested the assignments interface and implementation in the same collection pattern as tickets. Added assignment model and collection interfaces and `Assignments` with `find` and `list`; no tests were written or changed. Targeted lint passes; project typecheck still fails on the existing reconciler refactor and constructor wiring. `list` returns the supplied collection without filtering completed assignments.
 - User said not to write tests anymore and asked to record that in the agents file. Added the instruction to project `AGENTS.md`; existing tests were left untouched.
 - User asked to create the discussed ticket files and defer the `find` concern. Added the ticket model and collection interfaces, `Tickets` collection, and a focused test; did not wire the collection into the reconciler. The ticket test passes. Project lint and typecheck fail in the existing in-progress reconciler refactor, including its missing database dependency and constructor wiring.
 - User asked what applying the `Agents` collection pattern to ticket lookup in `AssignmentReconciler.runOnce` would look like, to check understanding. Discussed a `Tickets` collection with `find`, an injected interface, and replacing the database lookup; noted that the synchronous collection requires tickets to be loaded and raises a freshness decision. No implementation requested.

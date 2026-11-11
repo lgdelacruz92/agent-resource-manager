@@ -1,7 +1,9 @@
 // Turns reserved assignments into sessions and coordinates their final release.
 import { AgentsInterface } from "../interfaces/agents.interface.js";
+import { AssignmentsInterface } from "../interfaces/assignments.interface.js";
 import type { OpencodeAgentClientInterface, OpencodeSessionActivity } from "../interfaces/opencode-agent-client.interface.js"
 import type { Agent, Assignment, Execution, ResourceManagerDatabaseInterface, Ticket } from "../interfaces/resource-manager-database.interface.js"
+import { TicketsInterface } from "../interfaces/tickets.interface.js";
 import type { VikunjaInterface, VikunjaTask } from "../interfaces/vikunja.interface.js"
 
 interface Lock {
@@ -14,7 +16,9 @@ export class AssignmentReconciler {
   private readonly locallySent = new Map<number, number | null>()
 
   constructor(
+    private readonly tickets: TicketsInterface,
     private readonly agents: AgentsInterface,
+    private readonly assignments: AssignmentsInterface,
     private readonly vikunja: VikunjaInterface,
     private readonly lock: Lock,
     private readonly createClient: (url: string) => OpencodeAgentClientInterface,
@@ -24,10 +28,10 @@ export class AssignmentReconciler {
 
   async runOnce(): Promise<void> {
     const errors: unknown[] = []
-    for (const assignment of await this.database.listIncompleteAssignments()) {
+    for (const assignment of await this.assignments.list()) {
       try {
         const agent = this.agents.find(assignment.agentId)
-        const ticket = await this.database.getTicket(assignment.ticketId)
+        const ticket = this.tickets.find(assignment.ticketId)
         if (!agent || !ticket) throw new Error(`Assignment ${assignment.id} has a missing agent or ticket`)
         await this._reconcile(assignment, ticket, agent)
       } catch (error) {
