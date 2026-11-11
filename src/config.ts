@@ -34,6 +34,8 @@ export const config = {
   pollMs: _pollMs,
   opencodeHeaders: headers,
   executionTimeoutMs: _executionTimeoutMs,
+  lockName: process.env.LOCK_NAME || 'ticket-scheduling',
+  appName: process.env.APP_NAME || 'app',
   vikunja: {
     baseUrl: process.env.VIKUNJA_URL ?? "",
     token: process.env.VIKUNJA_API_TOKEN ?? "",

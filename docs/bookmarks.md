@@ -1,10 +1,12 @@
 # Resource Manager bookmark
 
-Estimated reading time: 8 minutes (150 WPM)
+Estimated reading time: 9 minutes (150 WPM)
 
 ## Current task
 
-- Reviewed the failed-execution branch in `assignment-reconciler.ts`: it updates assignment status and ticket status, then requests a Retry board move, but never completes the assignment, checks agent availability, or takes the scheduler lock. The assignment remains reserved and the branch repeats. No code changed.
+- Added `src/components/errors/lock-held-error.ts` with status 1 and a lock-specific message. The user wired it into `LockModel` and the failed-execution catch. Full typecheck still fails on in-progress reconciler lock methods and constructor wiring; no tests were written or run.
+- `LockModel` and its interface expose `create` and owner-checked `delete` only, without a collection. Creation detects contention atomically; the primary key already prevented duplicate locks. Earlier in-memory verification passed before the user's error edit; existing `SharedLock` remains unchanged.
+- Reviewed the evolving failed-execution branch in `assignment-reconciler.ts`: `LockHeldError` now prevents deletion after expected contention. Other acquisition errors still attempt deletion, failed deletion is retried, and completion precedes ticket update, preventing retry on ticket-update failure. Agent availability handling is missing, and full typecheck fails on old lock calls and constructor wiring. No code changed.
 - Implemented `Vikunja.sync(ticket)` to push the supplied ticket's title, priority, and status to an existing board card and verify changes. It refuses absent or missing cards; writes are non-atomic. The current failed-execution branch now calls `moveToColumn` directly instead of `sync`, still outside the scheduler lock; deployed API compatibility remains unverified. Targeted lint and full project typecheck passed when sync was added; no tests or live services were run.
 - Recorded the user's table/collection/row-model CRUD standard in `AGENTS.md`. Collections expose per-row CRUD and delegate database and resource handling to models. Existing code has not been refactored or verified against this standard.
 - All four model classes and interfaces now provide SQLite create, get, update, and delete methods. Ticket collections return model instances; ticket status validation includes `Flagged tickets`. Deleting agents and tickets is blocked when assignments reference them, and deleting assignments is blocked when executions reference them. Existing update calling patterns remain supported. Targeted model/collection typecheck and lint passed; no tests or live database operations were run.

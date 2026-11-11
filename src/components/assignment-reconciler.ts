@@ -1,19 +1,18 @@
 // Coordinates assignments without accessing the database directly.
+import { randomUUID } from "crypto";
+import { config } from "../config.js";
 import type { AgentModelInterface } from "../interfaces/agent-model.interface.js"
 import type { AgentsInterface } from "../interfaces/agents.interface.js"
 import type { AssignmentModelInterface } from "../interfaces/assignment-model.interface.js"
 import type { AssignmentsInterface } from "../interfaces/assignments.interface.js"
 import type { ExecutionModelInterface } from "../interfaces/execution-model.interface.js"
 import type { ExecutionsInterface } from "../interfaces/executions.interface.js"
+import { LockModelInterface } from "../interfaces/lock-model.interface.js";
 import type { OpencodeAgentClientInterface, OpencodeSessionActivity } from "../interfaces/opencode-agent-client.interface.js"
 import type { TicketModelInterface } from "../interfaces/ticket-model.interface.js"
 import type { TicketsInterface } from "../interfaces/tickets.interface.js"
 import type { VikunjaInterface, VikunjaTask } from "../interfaces/vikunja.interface.js"
-
-interface Lock {
-  tryAcquire(): Promise<string | null>
-  release(owner: string): Promise<void>
-}
+import { LockHeldError } from "./errors/lock-held-error.js";
 
 export class AssignmentReconciler {
   // A pre-prompt baseline prevents treating an old idle session as completed work.
@@ -24,8 +23,8 @@ export class AssignmentReconciler {
     private readonly agents: AgentsInterface,
     private readonly assignments: AssignmentsInterface,
     private readonly executions: ExecutionsInterface,
+    private readonly lock: LockModelInterface,
     private readonly vikunja: VikunjaInterface,
-    private readonly lock: Lock,
     private readonly createClient: (url: string) => OpencodeAgentClientInterface,
     private readonly timeoutMs: number | null = null,
     private readonly now: () => Date = () => new Date(),
@@ -49,14 +48,23 @@ export class AssignmentReconciler {
 
   private async _reconcile(assignment: AssignmentModelInterface, ticket: TicketModelInterface, agent: AgentModelInterface): Promise<void> {
     const execution = this.executions.getLatest(assignment.id)
+    const lockData = { name: config.lockName, owner: `${config.appName}:${randomUUID()}`, acquiredAt: new Date().toISOString()};
     if (execution?.status === "failed") {
-      // move vikunja ticket to retry
-      // update assignment status
-      await assignment.update({...assignment, status: 'failed'});
-      // update ticket status
-      await ticket.update({...ticket, status: 'Retry'});
-      // sync vikunja board
-      await this.vikunja. moveToColumn(ticket.vikunjaTaskId, 'Retry')
+      try {
+        
+        // move vikunja ticket to retry
+        await this.lock.create(lockData)
+        await this.vikunja. moveToColumn(ticket.vikunjaTaskId, 'Retry')
+        // update assignment status
+        await assignment.update({...assignment, status: 'failed', completedAt: new Date().toISOString()});
+        await ticket.update({...ticket, status: 'Retry'});
+        await this.lock.delete(lockData);
+      } catch (e){
+        if (!(e instanceof LockHeldError)) {
+          console.error('Failed to move ticket to retry')
+          await this.lock.delete(lockData); 
+        }
+      }
       return
     }
     if (execution?.status === "succeeded") {
