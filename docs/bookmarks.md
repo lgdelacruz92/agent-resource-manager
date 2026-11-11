@@ -4,6 +4,7 @@ Estimated reading time: 7 minutes (150 WPM)
 
 ## Current task
 
+- Started the `agents.ts` refactor by creating `src/interfaces/agent-model.interface.ts`, matching the existing agent data shape. User then changed `agents.ts` to filter agents and call `update`; explained that `filter` returns a truthy empty array and the agent data interface has no `update` method. Those later edits have not been validated.
 - User clarified that a dummy implementation should be empty, not an in-memory implementation. They renamed and changed it to `src/components/agents.ts`; `test/dummy-agents.test.ts` now imports it and checks its empty behavior. The focused test passes; full lint reports unused parameters, and typecheck reports an uninitialized field in `agents.ts`. The convention is recorded in `AGENTS.md`.
 - Explained the `async` parsing error in `src/interfaces/agents-manager.interface.ts`: remove `async` from the interface declaration and keep the `Promise<Agent[]>` return type. No source changes requested.
 - Explained `compilerOptions.types`: adding `node` includes Node globals from `@types/node`. This project already has that package and no explicit `types` list.

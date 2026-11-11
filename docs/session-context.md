@@ -35,6 +35,10 @@ Estimated reading time: 16 minutes (150 WPM)
 
 ## Recent context
 
+- User asked whether `find` throws or returns `undefined` when no item matches. Clarified that it returns `undefined`; the caller can throw explicitly. No source changes requested.
+- User asked whether `agents.ts` line 14 throws when no agent matches. Explained that `filter` returns an empty, truthy array; `find` returns `undefined` when absent. Also noted that the current agent data interface has no `update` method. No source changes requested.
+- User asked to create `AgentModelInterface` while starting an `agents.ts` refactor. Added `src/interfaces/agent-model.interface.ts` with the existing agent data fields, matching its current use as a list item; left `agents.ts` unchanged. The new interface passes targeted lint and the dummy test passes. Full lint still reports unused items in `agents.ts`; typecheck still reports its uninitialized field.
+- User asked what `DatabaseSync` is. Explained Node's built-in synchronous SQLite connection, blocking behavior, and its use in `src/db/database.ts`; no code changes requested.
 - User requested updating the leftover dummy-agents test. Changed it to import `Agents` and check its empty placeholder behavior; the focused test passes. Full lint reports three unused parameters in `src/components/agents.ts`, and typecheck reports its uninitialized `agents` field. Left that user-edited source unchanged.
 - User clarified that a dummy implementation means empty methods or minimal type-compatible placeholder returns, not an in-memory implementation. They renamed and changed the prior implementation to `src/components/agents.ts`. Recorded the convention in project `AGENTS.md`; the earlier `test/dummy-agents.test.ts` still imports the removed implementation and was not changed.
 - User requested a dummy implementation of `AgentsInterface`. Added `DummyAgents` in `src/components/dummy-agents.ts`, an unwired in-memory implementation with optional initial agents and status updates; unknown IDs throw. Added two focused tests; lint, typecheck, and both tests passed. No database or live services were touched.
