@@ -2,6 +2,14 @@
 
 Estimated reading time: 9 minutes (150 WPM)
 
+## Redesign scheduler
+
+Only one scheduler can claim a ticket. The database should enforce this atomically, rather than relying on a separate “is it free?” check.
+An abandoned claim can be recovered. If an agent crashes, the ticket should eventually become available again.
+An old agent can’t complete someone else’s assignment. When a ticket is reassigned, give the new assignment a unique ID or version. Accept completion only if it matches the current assignment.
+Retries don’t accidentally duplicate important actions. For example, submitting the same completion twice shouldn’t create two follow-up tickets.
+Related database changes happen together. If claiming a ticket requires updating both the ticket and assignment tables, use a transaction so they don’t disagree after a crash.
+
 ## Current task
 
 - Added `src/components/errors/lock-held-error.ts` with status 1 and a lock-specific message. The user wired it into `LockModel` and the failed-execution catch. Full typecheck still fails on in-progress reconciler lock methods and constructor wiring; no tests were written or run.
