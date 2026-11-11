@@ -4,6 +4,7 @@ Estimated reading time: 6 minutes (150 WPM)
 
 ## Current task
 
+- Explained `compilerOptions.types`: adding `node` includes Node globals from `@types/node`. This project already has that package and no explicit `types` list.
 - Discussed TypeScript language support in VS Code and the distinction between its built-in TypeScript server and an LSP-compatible server. `typescript-language-server` was not found on PATH, in the project, or in global npm packages; other installations were not ruled out.
 - Both `npm run dev` and `npm start` now load `.env.local` using `--env-file`. The manager was not started.
 

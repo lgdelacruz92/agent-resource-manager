@@ -35,6 +35,7 @@ Estimated reading time: 13 minutes (150 WPM)
 
 ## Recent context
 
+- User asked what adding `node` to `compilerOptions.types` means. Explained Node global type definitions and the allowlist; this project has `@types/node` and no explicit `types` field.
 - User asked how to check VS Code for TypeScript language support. Suggested checking its built-in TypeScript extension and TypeScript server commands; VS Code's built-in server is not necessarily an LSP server.
 - User asked whether `typescript-language-server` is installed. It was not found on PATH, in this project's npm dependencies, or in global npm packages; other installations were not ruled out.
 - User asked whether TypeScript is an LSP. Explained the distinction between TypeScript, its language service, and the LSP-compatible language server.
