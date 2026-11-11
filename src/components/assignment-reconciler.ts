@@ -1,4 +1,5 @@
 // Turns reserved assignments into sessions and coordinates their final release.
+import { AgentsInterface } from "../interfaces/agents.interface.js";
 import type { OpencodeAgentClientInterface, OpencodeSessionActivity } from "../interfaces/opencode-agent-client.interface.js"
 import type { Agent, Assignment, Execution, ResourceManagerDatabaseInterface, Ticket } from "../interfaces/resource-manager-database.interface.js"
 import type { VikunjaInterface, VikunjaTask } from "../interfaces/vikunja.interface.js"
@@ -13,7 +14,7 @@ export class AssignmentReconciler {
   private readonly locallySent = new Map<number, number | null>()
 
   constructor(
-    private readonly database: ResourceManagerDatabaseInterface,
+    private readonly agents: AgentsInterface,
     private readonly vikunja: VikunjaInterface,
     private readonly lock: Lock,
     private readonly createClient: (url: string) => OpencodeAgentClientInterface,
@@ -22,11 +23,10 @@ export class AssignmentReconciler {
   ) {}
 
   async runOnce(): Promise<void> {
-    const agents = new Map((await this.database.listAgents()).map((agent) => [agent.id, agent]))
     const errors: unknown[] = []
     for (const assignment of await this.database.listIncompleteAssignments()) {
       try {
-        const agent = agents.get(assignment.agentId)
+        const agent = this.agents.find(assignment.agentId)
         const ticket = await this.database.getTicket(assignment.ticketId)
         if (!agent || !ticket) throw new Error(`Assignment ${assignment.id} has a missing agent or ticket`)
         await this._reconcile(assignment, ticket, agent)

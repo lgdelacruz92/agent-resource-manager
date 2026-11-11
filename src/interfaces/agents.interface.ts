@@ -1,6 +1,7 @@
-import { Agent } from '../types/agent.type.js';
+import { AgentModelInterface } from './agent-model.interface.js';
 
 export interface AgentsInterface {
-   list(): Promise<Agent[]>
+   find(agentId: number): AgentModelInterface | undefined;
+   list(): Promise<AgentModelInterface[]>
    update(agentId: number, status: string): Promise<void>
 }
