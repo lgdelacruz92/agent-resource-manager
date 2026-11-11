@@ -4,7 +4,8 @@ Estimated reading time: 6 minutes (150 WPM)
 
 ## Current task
 
-- User asked how to load `.env.local` with `tsx watch src/index.ts`. Suggested the Node `--env-file` option; no configuration changes requested.
+- Discussed TypeScript language support in VS Code and the distinction between its built-in TypeScript server and an LSP-compatible server. `typescript-language-server` was not found on PATH, in the project, or in global npm packages; other installations were not ruled out.
+- Both `npm run dev` and `npm start` now load `.env.local` using `--env-file`. The manager was not started.
 
 ## Previous task: board-driven completion
 

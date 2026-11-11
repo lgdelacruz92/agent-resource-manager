@@ -35,6 +35,10 @@ Estimated reading time: 13 minutes (150 WPM)
 
 ## Recent context
 
+- User asked how to check VS Code for TypeScript language support. Suggested checking its built-in TypeScript extension and TypeScript server commands; VS Code's built-in server is not necessarily an LSP server.
+- User asked whether `typescript-language-server` is installed. It was not found on PATH, in this project's npm dependencies, or in global npm packages; other installations were not ruled out.
+- User asked whether TypeScript is an LSP. Explained the distinction between TypeScript, its language service, and the LSP-compatible language server.
+- User asked to load `.env.local` in `npm start` as well. Updated the start script without starting the manager.
 - User asked how to load `.env.local` with `tsx watch src/index.ts`. Suggested Node's `--env-file` option; no app or configuration changes requested.
 - User asked to be reminded of the board-driven completion gaps on returning. Recorded all six open questions and the first suggested discussion in [bookmarks](bookmarks.md); no implementation was requested.
 - User proposed dropping the manager's review stage: another app can handle review later, while the manager completes an assignment when its ticket was previously In progress and is now Done. Discussed gaps including missed In progress transitions, current automatic Done moves, external board changes, failures, agent availability, and stale or unavailable board data. No implementation requested.
