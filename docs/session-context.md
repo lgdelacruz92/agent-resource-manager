@@ -1,6 +1,6 @@
 # Agent resource manager session context
 
-Estimated reading time: 25 minutes (150 WPM)
+Estimated reading time: 26 minutes (150 WPM)
 
 ## Working agreement
 
@@ -35,6 +35,7 @@ Estimated reading time: 25 minutes (150 WPM)
 
 ## Recent context
 
+- User established a coding standard in `AGENTS.md`: each table has a collection and row model; the collection offers per-row CRUD while models own database and other resource updates and hide those details from the collection. This is a design direction, not a claim that the existing code already complies; no source changes were requested.
 - User requested CRUD methods on all models, using assignments and tickets as blueprints. Added missing SQLite methods and interface declarations for agents, executions, and tickets; ticket collections now return `TicketModel` instances. Protected referenced agent deletion, preserved existing update call patterns, and added `Flagged tickets` to valid ticket statuses. Targeted model/collection typecheck and lint pass; full typecheck remains blocked by the existing `assignment-reconciler.ts` syntax error. No tests or live database operations were run.
 - User requested `create`, `get`, and `delete` on `TicketModel`. Added SQLite operations, constructor-supplied data, generated IDs, validation and a guard against deleting tickets with assignments. `get` accepts only the statuses in the current ticket interface; the methods are not on the interface or wired into `Tickets`. Targeted lint and strict typecheck pass; full typecheck is blocked by the existing `assignment-reconciler.ts` syntax error. No tests or live database operations were run.
 - User requested the discussed visibility fix. Removed `private` from the six ticket properties while keeping them readonly; isolated strict typecheck and targeted ESLint pass. No tests were written or run.
