@@ -1,8 +1,12 @@
 // Turns reserved assignments into sessions and coordinates their final release.
+import { AgentModelInterface } from "../interfaces/agent-model.interface.js";
 import { AgentsInterface } from "../interfaces/agents.interface.js";
+import { AssignmentModelInterface } from "../interfaces/assignment-model.interface.js";
 import { AssignmentsInterface } from "../interfaces/assignments.interface.js";
+import { ExecutionsInterface } from "../interfaces/executions.interface.js";
 import type { OpencodeAgentClientInterface, OpencodeSessionActivity } from "../interfaces/opencode-agent-client.interface.js"
 import type { Agent, Assignment, Execution, ResourceManagerDatabaseInterface, Ticket } from "../interfaces/resource-manager-database.interface.js"
+import { TicketModelInterface } from "../interfaces/ticket-model.interface.js";
 import { TicketsInterface } from "../interfaces/tickets.interface.js";
 import type { VikunjaInterface, VikunjaTask } from "../interfaces/vikunja.interface.js"
 
@@ -19,12 +23,13 @@ export class AssignmentReconciler {
     private readonly tickets: TicketsInterface,
     private readonly agents: AgentsInterface,
     private readonly assignments: AssignmentsInterface,
+    private readonly executions: ExecutionsInterface,
     private readonly vikunja: VikunjaInterface,
     private readonly lock: Lock,
     private readonly createClient: (url: string) => OpencodeAgentClientInterface,
     private readonly timeoutMs: number | null = null,
     private readonly now: () => Date = () => new Date(),
-  ) {}
+  ) { }
 
   async runOnce(): Promise<void> {
     const errors: unknown[] = []
@@ -42,22 +47,28 @@ export class AssignmentReconciler {
     if (errors.length) throw new AggregateError(errors, "One or more assignments could not be reconciled")
   }
 
-  private async _reconcile(assignment: Assignment, ticket: Ticket, agent: Agent): Promise<void> {
-    let execution = await this.database.getLatestExecution(assignment.id)
-    if (await this._handleFinishedExecution(assignment, ticket, agent, execution)) return
-    if (execution?.status === "failed") execution = null
-
-    if (!agent.url) throw new Error(`Agent ${agent.id} has no URL; assignment remains reserved`)
-    const client = this.createClient(agent.url)
+  private async _reconcile(assignment: AssignmentModelInterface,
+                          ticket: TicketModelInterface,
+                          agent: AgentModelInterface): Promise<void> {
+    const execution = this.executions.getLatest();
     if (!execution) {
-      await this._startExecution(assignment, ticket, agent, client)
+      await this._startExecution(assignment, ticket, agent)
       return
     }
-    if (!execution.sessionId) {
-      await this._recoverExecutionWithoutSession(execution, ticket, agent, client)
+
+    // Already an execution processing
+    if (execution.status === 'starting' || execution.status === 'running') {
       return
     }
-    await this._reconcileSession(assignment, ticket, agent, execution, execution.sessionId, client)
+
+    // this means failed execution
+    if (execution.status === 'failed') {
+      // move to retry
+      return
+    }
+
+    // handle succeeded
+
   }
 
   private async _startExecution(assignment: Assignment, ticket: Ticket, agent: Agent, client: OpencodeAgentClientInterface): Promise<void> {
