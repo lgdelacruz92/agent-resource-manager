@@ -1,5 +1,6 @@
 // Fetches complete tasks and moves cards on the configured Vikunja board.
 import type { ResourceManagerColumn, VikunjaInterface, VikunjaTask } from "../interfaces/vikunja.interface.js"
+import type { TicketModelInterface } from "../interfaces/ticket-model.interface.js"
 
 export interface VikunjaOptions {
   baseUrl: string
@@ -54,6 +55,38 @@ export class Vikunja implements VikunjaInterface {
     return { id: taskId, title: task.title, description: task.description }
   }
 
+  async sync(ticket: TicketModelInterface): Promise<void> {
+    if (!positiveInteger(ticket.vikunjaTaskId)) throw new Error("Vikunja task ID must be a positive integer")
+    if (!ticket.presentOnBoard) throw new Error(`Ticket ${ticket.id} is not marked present on the board`)
+    if (!ticket.title.trim() || !Number.isSafeInteger(ticket.priority)) throw new Error(`Ticket ${ticket.id} has invalid task details`)
+
+    const column = await this.getTaskColumn(ticket.vikunjaTaskId)
+    if (column === null) throw new Error(`Vikunja task ${ticket.vikunjaTaskId} was not found on the board`)
+
+    const path = `/api/v1/tasks/${ticket.vikunjaTaskId}`
+    const current: unknown = await (await this._request(path)).json()
+    if (!isRecord(current) || current.id !== ticket.vikunjaTaskId
+      || typeof current.title !== "string" || typeof current.priority !== "number" || !Number.isSafeInteger(current.priority)) {
+      throw new Error("Vikunja returned invalid task details")
+    }
+
+    if (current.title !== ticket.title || current.priority !== ticket.priority) {
+      await this._request(path, { ...current, title: ticket.title, priority: ticket.priority })
+      const updated: unknown = await (await this._request(path)).json()
+      if (!isRecord(updated) || updated.id !== ticket.vikunjaTaskId
+        || updated.title !== ticket.title || updated.priority !== ticket.priority) {
+        throw new Error(`Vikunja task ${ticket.vikunjaTaskId} details could not be confirmed`)
+      }
+    }
+
+    if (column !== ticket.status) {
+      await this._moveToColumn(ticket.vikunjaTaskId, ticket.status)
+      if (await this.getTaskColumn(ticket.vikunjaTaskId) !== ticket.status) {
+        throw new Error(`Vikunja task ${ticket.vikunjaTaskId} column could not be confirmed`)
+      }
+    }
+  }
+
   async getTaskColumn(taskId: number): Promise<string | null> {
     if (!positiveInteger(taskId)) throw new Error("Vikunja task ID must be a positive integer")
     const base = `/api/v1/projects/${this.options.projectId}/views/${this.options.viewId}`
@@ -103,6 +136,10 @@ export class Vikunja implements VikunjaInterface {
   }
 
   async moveToColumn(taskId: number, column: ResourceManagerColumn): Promise<void> {
+    await this._moveToColumn(taskId, column)
+  }
+
+  private async _moveToColumn(taskId: number, column: string): Promise<void> {
     if (!positiveInteger(taskId)) throw new Error("Vikunja task ID must be a positive integer")
     const base = `/api/v1/projects/${this.options.projectId}/views/${this.options.viewId}`
     const buckets: unknown = await (await this._request(`${base}/tasks?page=1&per_page=50`)).json()

@@ -1,4 +1,5 @@
 // Defines the Vikunja operations the Resource Manager needs.
+import type { TicketModelInterface } from "./ticket-model.interface.js"
 
 // Ticket details needed to begin work; more payload fields can be added when agreed.
 export interface VikunjaTask {
@@ -12,6 +13,9 @@ export type ResourceManagerColumn = "In progress" | "Done" | "Retry"
 
 // Fetches ticket details and moves tickets on the Vikunja board.
 export interface VikunjaInterface {
+  // Push a ticket's title, priority and status to its existing board task.
+  sync(ticket: TicketModelInterface): Promise<void>
+
   // Fetch a task by its Vikunja task ID; reject if the task cannot be retrieved.
   getTask(taskId: number): Promise<VikunjaTask>
 

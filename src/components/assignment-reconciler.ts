@@ -54,8 +54,9 @@ export class AssignmentReconciler {
       // update assignment status
       await assignment.update({...assignment, status: 'failed'});
       // update ticket status
-      
-      await this._finishAssignment(assignment, ticket, agent, "failed")
+      await ticket.update({...ticket, status: 'Retry'});
+      // sync vikunja board
+      await this.vikunja. moveToColumn(ticket.vikunjaTaskId, 'Retry')
       return
     }
     if (execution?.status === "succeeded") {

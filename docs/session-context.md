@@ -1,6 +1,6 @@
 # Agent resource manager session context
 
-Estimated reading time: 26 minutes (150 WPM)
+Estimated reading time: 27 minutes (150 WPM)
 
 ## Working agreement
 
@@ -35,6 +35,9 @@ Estimated reading time: 26 minutes (150 WPM)
 
 ## Recent context
 
+- User asked whether the failed-execution branch at `assignment-reconciler.ts:52` meets the original goal. It sets assignment status to failed, updates the local ticket to Retry, and requests a board move, but never sets `completedAt`, checks agent availability, or acquires the scheduler lock. The incomplete assignment keeps the ticket and agent reserved, and the branch repeats. Updates can partially succeed; no code was changed.
+- User clarified that `Vikunja.sync(ticket)` pushes the ticket model to the board. Added the method to the interface and implementation: it uses the supplied snapshot, updates title and priority, moves the existing card to the status column, and verifies changes. It refuses tickets marked absent or missing from the board. Sync consists of multiple non-atomic remote operations; the user's existing reconciler calls it outside the scheduler lock, creating a coordination risk. Targeted lint and full project typecheck pass. No tests or live service operations were run; deployed API compatibility remains unverified.
+- User requested a Vikunja `sync` method accepting `TicketModelInterface`. The new reconciler call says to sync the board after updating the ticket, but the direction and fields to sync are not specified; asked for clarification before implementing external changes. `TicketModel.update` currently writes the database without changing the passed-in model's state. No source changes made.
 - User established a coding standard in `AGENTS.md`: each table has a collection and row model; the collection offers per-row CRUD while models own database and other resource updates and hide those details from the collection. This is a design direction, not a claim that the existing code already complies; no source changes were requested.
 - User requested CRUD methods on all models, using assignments and tickets as blueprints. Added missing SQLite methods and interface declarations for agents, executions, and tickets; ticket collections now return `TicketModel` instances. Protected referenced agent deletion, preserved existing update call patterns, and added `Flagged tickets` to valid ticket statuses. Targeted model/collection typecheck and lint pass; full typecheck remains blocked by the existing `assignment-reconciler.ts` syntax error. No tests or live database operations were run.
 - User requested `create`, `get`, and `delete` on `TicketModel`. Added SQLite operations, constructor-supplied data, generated IDs, validation and a guard against deleting tickets with assignments. `get` accepts only the statuses in the current ticket interface; the methods are not on the interface or wired into `Tickets`. Targeted lint and strict typecheck pass; full typecheck is blocked by the existing `assignment-reconciler.ts` syntax error. No tests or live database operations were run.

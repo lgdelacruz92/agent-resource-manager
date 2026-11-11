@@ -4,8 +4,10 @@ Estimated reading time: 8 minutes (150 WPM)
 
 ## Current task
 
+- Reviewed the failed-execution branch in `assignment-reconciler.ts`: it updates assignment status and ticket status, then requests a Retry board move, but never completes the assignment, checks agent availability, or takes the scheduler lock. The assignment remains reserved and the branch repeats. No code changed.
+- Implemented `Vikunja.sync(ticket)` to push the supplied ticket's title, priority, and status to an existing board card and verify changes. It refuses absent or missing cards; writes are non-atomic. The current failed-execution branch now calls `moveToColumn` directly instead of `sync`, still outside the scheduler lock; deployed API compatibility remains unverified. Targeted lint and full project typecheck passed when sync was added; no tests or live services were run.
 - Recorded the user's table/collection/row-model CRUD standard in `AGENTS.md`. Collections expose per-row CRUD and delegate database and resource handling to models. Existing code has not been refactored or verified against this standard.
-- All four model classes and interfaces now provide SQLite create, get, update, and delete methods. Ticket collections return model instances; ticket status validation includes `Flagged tickets`. Deleting agents and tickets is blocked when assignments reference them, and deleting assignments is blocked when executions reference them. Existing update calling patterns remain supported. Targeted model/collection typecheck and lint pass; full project typecheck is blocked by the existing syntax error in `assignment-reconciler.ts`. No tests or live database operations were run.
+- All four model classes and interfaces now provide SQLite create, get, update, and delete methods. Ticket collections return model instances; ticket status validation includes `Flagged tickets`. Deleting agents and tickets is blocked when assignments reference them, and deleting assignments is blocked when executions reference them. Existing update calling patterns remain supported. Targeted model/collection typecheck and lint passed; no tests or live database operations were run.
 
 ## Previous task: database diagram
 
